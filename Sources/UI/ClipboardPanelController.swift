@@ -19,8 +19,11 @@ final class ClipboardPanelController: NSObject, NSWindowDelegate {
 
     func show(anchor: NSRect) {
         let panel = ensurePanel()
-        model.searchText = ""
-        model.reload()
+        if model.searchText.isEmpty {
+            model.reload()
+        } else {
+            model.searchText = ""   // didSet 会触发去抖后的 reload
+        }
 
         let size = NSSize(width: panelWidth, height: panelHeight)
         var origin = NSPoint(x: anchor.midX - size.width / 2, y: anchor.minY - size.height - 8)
@@ -37,7 +40,7 @@ final class ClipboardPanelController: NSObject, NSWindowDelegate {
 
         NSApp.activate(ignoringOtherApps: true)
         panel.makeKeyAndOrderFront(nil)
-        model.requestFocus()
+        // 面板刚显示时窗口还没真正成为 key window，稍后再移一次焦点即可
         DispatchQueue.main.async { [weak self] in
             self?.model.requestFocus()
             self?.panel?.invalidateShadow()

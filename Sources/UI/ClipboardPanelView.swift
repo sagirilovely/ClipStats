@@ -16,7 +16,6 @@ struct ClipboardPanelView: View {
         .frame(width: 390, height: CGFloat(model.panelHeight))
         .liquidGlassPanel(cornerRadius: 18)
         .onAppear {
-            model.reload()
             searchFocused = true
         }
         .onChange(of: model.focusToken) { _ in
@@ -86,9 +85,8 @@ struct ClipboardPanelView: View {
     private func filterPill(_ filter: ClipboardPanelModel.FilterKind) -> some View {
         let isSelected = model.selectedFilter == filter
         return Button {
-            withAnimation(.easeInOut(duration: 0.15)) {
-                model.selectedFilter = filter
-            }
+            // 不要用 withAnimation 包裹：它会把整个列表的 diff 一起做成动画，切换时明显卡顿
+            model.selectedFilter = filter
         } label: {
             HStack(spacing: 4) {
                 Image(systemName: filter.icon)
@@ -106,6 +104,7 @@ struct ClipboardPanelView: View {
                         LiquidGlassStyle.surfaceGloss
                     }
                 }
+                .animation(.easeInOut(duration: 0.15), value: isSelected)
             )
             .clipShape(Capsule())
             .overlay(
@@ -150,6 +149,7 @@ struct ClipboardPanelView: View {
                         ForEach(model.items) { item in
                             ClipRow(
                                 item: item,
+                                thumbnail: { model.thumbnail(for: item) },
                                 hovered: model.hoveredID == item.id,
                                 onSelect: { model.restore(item) },
                                 onTogglePin: { model.togglePin(item) },
@@ -305,6 +305,8 @@ struct ClipboardPanelView: View {
 
 private struct ClipRow: View {
     let item: ClipboardStore.Item
+    /// 延迟到渲染时再解码，配合 model 内的缓存
+    let thumbnail: () -> NSImage?
     let hovered: Bool
     let onSelect: () -> Void
     let onTogglePin: () -> Void
@@ -362,9 +364,8 @@ private struct ClipRow: View {
 
             Spacer(minLength: 4)
 
-            // 悬停操作按钮组
-            if hovered || item.pinned {
-                HStack(spacing: 4) {
+            // 悬停操作按钮组：常驻布局，仅切换透明度（避免插入/移除导致整行重排）
+            HStack(spacing: 4) {
                     Button {
                         onTogglePin()
                     } label: {
@@ -390,9 +391,9 @@ private struct ClipRow: View {
                     }
                     .buttonStyle(.plain)
                     .help("删除此项")
-                }
-                .transition(.opacity.combined(with: .scale(scale: 0.92)))
             }
+            .opacity(hovered || item.pinned ? 1 : 0)
+            .allowsHitTesting(hovered || item.pinned)
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 7)
@@ -431,7 +432,7 @@ private struct ClipRow: View {
     private var leadingBadge: some View {
         switch item.kind {
         case .image:
-            if let data = item.thumbData, let image = NSImage(data: data) {
+            if let image = thumbnail() {
                 Image(nsImage: image)
                     .resizable()
                     .aspectRatio(contentMode: .fill)

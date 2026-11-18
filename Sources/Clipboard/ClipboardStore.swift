@@ -57,6 +57,7 @@ final class ClipboardStore {
         """)
         execute("CREATE INDEX IF NOT EXISTS idx_items_hash ON items(hash);")
         execute("CREATE INDEX IF NOT EXISTS idx_items_created ON items(created_at DESC);")
+        execute("CREATE INDEX IF NOT EXISTS idx_items_pinned_created ON items(pinned DESC, created_at DESC);")
     }
 
     // MARK: - 基础
@@ -170,7 +171,8 @@ final class ClipboardStore {
         lock.lock()
         defer { lock.unlock() }
 
-        var sql = "SELECT id, kind, text, thumb, created_at, source_app, pinned FROM items WHERE 1=1"
+        // 列表不加载 thumb BLOB：只按需（渲染某一行时）再单独取，避免每次刷新拷贝几十 MB
+        var sql = "SELECT id, kind, text, created_at, source_app, pinned FROM items WHERE 1=1"
         let trimmed = search.trimmingCharacters(in: .whitespaces)
         if !trimmed.isEmpty {
             sql += " AND text LIKE ?"
@@ -208,7 +210,7 @@ final class ClipboardStore {
         lock.lock()
         defer { lock.unlock() }
         guard let statement = prepare("""
-        SELECT id, kind, text, thumb, created_at, source_app, pinned FROM items WHERE id = ?
+        SELECT id, kind, text, created_at, source_app, pinned FROM items WHERE id = ?
         """) else { return nil }
         defer { sqlite3_finalize(statement) }
         sqlite3_bind_int64(statement, 1, id)
@@ -224,21 +226,16 @@ final class ClipboardStore {
         let id = sqlite3_column_int64(statement, 0)
         let text = sqlite3_column_text(statement, 2).map { String(cString: $0) }
 
-        var thumb: Data?
-        if let bytes = sqlite3_column_blob(statement, 3) {
-            let count = Int(sqlite3_column_bytes(statement, 3))
-            if count > 0 { thumb = Data(bytes: bytes, count: count) }
-        }
-        let createdAt = Date(timeIntervalSince1970: sqlite3_column_double(statement, 4))
-        let sourceApp = sqlite3_column_text(statement, 5).map { String(cString: $0) }
-        let pinned = sqlite3_column_int(statement, 6) != 0
+        let createdAt = Date(timeIntervalSince1970: sqlite3_column_double(statement, 3))
+        let sourceApp = sqlite3_column_text(statement, 4).map { String(cString: $0) }
+        let pinned = sqlite3_column_int(statement, 5) != 0
 
         return Item(
             id: id,
             kind: kind,
             text: text,
             preview: Self.preview(kind: kind, text: text),
-            thumbData: thumb,
+            thumbData: nil,
             createdAt: createdAt,
             sourceApp: sourceApp,
             pinned: pinned
@@ -263,6 +260,20 @@ final class ClipboardStore {
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             return String(collapsed.prefix(2000))
         }
+    }
+
+    /// 按需读取某一行的缩略图（列表查询不再携带它）
+    func thumbnailData(id: Int64) -> Data? {
+        lock.lock()
+        defer { lock.unlock() }
+        guard let statement = prepare("SELECT thumb FROM items WHERE id = ?") else { return nil }
+        defer { sqlite3_finalize(statement) }
+        sqlite3_bind_int64(statement, 1, id)
+        guard sqlite3_step(statement) == SQLITE_ROW,
+              let bytes = sqlite3_column_blob(statement, 0) else { return nil }
+        let count = Int(sqlite3_column_bytes(statement, 0))
+        guard count > 0 else { return nil }
+        return Data(bytes: bytes, count: count)
     }
 
     func payload(id: Int64) -> Data? {

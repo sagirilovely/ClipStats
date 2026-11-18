@@ -1,6 +1,13 @@
 import Foundation
 
 enum Fmt {
+    /// 复用同一个 formatter：每行每帧新建 DateFormatter 是毫秒级开销
+    static let dayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "M月d日 HH:mm"
+        return formatter
+    }()
+
     /// 0.23 -> "23%"
     static func percent(_ value: Double, digits: Int = 0) -> String {
         guard value.isFinite else { return "--" }
@@ -47,9 +54,7 @@ enum Fmt {
         if delta < 60 { return String(format: "%.0f 秒前", delta) }
         if delta < 3600 { return String(format: "%.0f 分钟前", delta / 60) }
         if delta < 86400 { return String(format: "%.0f 小时前", delta / 3600) }
-        let formatter = DateFormatter()
-        formatter.dateFormat = "M月d日 HH:mm"
-        return formatter.string(from: date)
+        return Fmt.dayFormatter.string(from: date)
     }
 
     static func clock(_ date: Date) -> String {

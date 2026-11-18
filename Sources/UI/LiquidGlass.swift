@@ -18,9 +18,11 @@ struct VisualEffectView: NSViewRepresentable {
     }
 
     func updateNSView(_ nsView: NSVisualEffectView, context: Context) {
-        nsView.material = material
-        nsView.blendingMode = blendingMode
-        nsView.state = state
+        // 只在真正变化时赋值：重复设置 material/blendingMode 会让背后的
+        // NSVisualEffectView 重新做一次整块模糊合成
+        if nsView.material != material { nsView.material = material }
+        if nsView.blendingMode != blendingMode { nsView.blendingMode = blendingMode }
+        if nsView.state != state { nsView.state = state }
     }
 }
 
@@ -99,8 +101,7 @@ struct LiquidGlassPanelModifier: ViewModifier {
                     .strokeBorder(Color.white.opacity(0.06), lineWidth: 0.5)
                     .padding(1)
             )
-            .shadow(color: Color.black.opacity(0.25), radius: 24, x: 0, y: 12)
-            .shadow(color: Color.black.opacity(0.12), radius: 6, x: 0, y: 2)
+            // 阴影交给 NSPanel（hasShadow + invalidateShadow），这里不再叠加强制离屏合成
     }
 }
 
