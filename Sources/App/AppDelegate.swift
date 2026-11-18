@@ -9,6 +9,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private var statusBar: StatusBarController!
     private var panelController: ClipboardPanelController!
+    private var appsController: RunningAppsPanelController!
     private var settingsWindow: SettingsWindowController?
 
     private var lastApplied: AppSettings?
@@ -21,9 +22,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.buildMenu()
         }
         panelController = ClipboardPanelController()
+        appsController = RunningAppsPanelController()
 
-        statusBar.onTogglePanel = { [weak self] anchor in
-            self?.panelController.toggle(anchor: anchor)
+        // 点剪贴板分段 → 剪贴板历史；点其它任意位置 → 正在运行的应用程序
+        statusBar.onSegmentClick = { [weak self] kind, anchor in
+            guard let self else { return }
+            if kind == .clipboard {
+                self.appsController.hide()
+                self.panelController.toggle(anchor: anchor)
+            } else {
+                self.panelController.hide()
+                self.appsController.toggle(anchor: anchor)
+            }
+        }
+        appsController.onVisibilityChange = { [weak self] visible in
+            self?.statusBar.setPanelOpen(visible)
+        }
+        appsController.model.onOpenSettings = { [weak self] in
+            self?.appsController.hide()
+            self?.openSettingsWindow()
         }
         panelController.onVisibilityChange = { [weak self] visible in
             self?.statusBar.setPanelOpen(visible)
@@ -135,6 +152,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
                 guard let self else { return }
                 let frame = self.statusBar.anchorFrame
+                if let view = self.statusBar.statusView as? StatusItemView {
+                    let rects = view.debugSegmentRects()
+                        .map { "\($0.0)[\(Int($0.1.minX))-\(Int($0.1.maxX))]" }
+                        .joined(separator: " ")
+                    NSLog("%@", "DIAG segments: \(rects) bounds=\(view.bounds.width)")
+                    NSLog("%@", "DIAG hitTest: \(view.debugHitKinds())")
+                    NSLog("%@", "DIAG hitViews=\(view.debugHitViewCount)")
+                }
                 NSLog("%@", "DIAG statusItem frame=\(frame) segments=\(self.store.settings.segments.filter(\.enabled).map(\.kind.rawValue))")
                 self.verifyBarWidth()
             }
@@ -297,6 +322,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         engine.stop()
         monitor.stop()
+        appsController?.hide()
+        appsController?.model.cancelPendingVerifications()
         GlobalHotKeyManager.shared.unregister()
     }
 
@@ -332,6 +359,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if previous == nil || previous?.hotKey != settings.hotKey {
             GlobalHotKeyManager.shared.register(settings.hotKey) { [weak self] in
                 guard let self else { return }
+                self.appsController?.hide()
                 self.panelController.toggle(anchor: self.statusBar.anchorFrame)
             }
         }
@@ -373,6 +401,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         history.target = self
         menu.addItem(history)
 
+        let runningApps = NSMenuItem(title: "正在运行的应用…", action: #selector(showRunningApps), keyEquivalent: "")
+        runningApps.target = self
+        menu.addItem(runningApps)
+
         menu.addItem(.separator())
 
         let pauseTitle = store.settings.clipboardPaused ? "恢复记录" : "暂停记录"
@@ -398,7 +430,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func showHistory() {
+        appsController.hide()
         panelController.show(anchor: statusBar.anchorFrame)
+    }
+
+    @objc private func showRunningApps() {
+        panelController.hide()
+        appsController.show(anchor: statusBar.anchorFrame)
     }
 
     @objc private func togglePause() {
@@ -412,6 +450,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func openSettings() {
+        panelController.hide()
+        appsController?.hide()
         openSettingsWindow()
     }
 

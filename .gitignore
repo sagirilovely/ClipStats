@@ -10,3 +10,6 @@ Resources/AppIcon.iconset/
 .idea/
 .DS_Store
 *.swiftmodule
+
+# 上游参考项目（仅本地查阅，不纳入仓库）
+stats/

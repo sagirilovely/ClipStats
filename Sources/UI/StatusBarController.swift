@@ -9,9 +9,18 @@ struct StatusSegment {
         case none
     }
 
+    /// 该分段对应的模块，用于点击命中判定；占位分段为 nil
+    let kind: SegmentKind?
     let label: Label
     let lines: [String]
     let templates: [String]
+
+    init(kind: SegmentKind? = nil, label: Label, lines: [String], templates: [String]) {
+        self.kind = kind
+        self.label = label
+        self.lines = lines
+        self.templates = templates
+    }
 }
 
 // MARK: - 外观配置
@@ -41,6 +50,16 @@ private final class StatusContentView: NSView {
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
 }
 
+/// 每个分段一个透明命中视图：由 AppKit 负责命中测试，避免自己算坐标。
+private final class SegmentHitView: NSView {
+    var kind: SegmentKind?
+    var onMouseDown: ((NSEvent) -> Void)?
+
+    override func mouseDown(with event: NSEvent) { onMouseDown?(event) }
+    override func rightMouseDown(with event: NSEvent) { onMouseDown?(event) }
+    override var mouseDownCanMoveWindow: Bool { false }
+}
+
 // MARK: - 状态栏视图
 
 /// 自绘状态栏：多段文字 + SF Symbols 图标或文字标签，支持固定槽位、双行排列、背景样式。
@@ -60,7 +79,8 @@ final class StatusItemView: NSView {
         }
     }
 
-    var onLeftClick: ((NSEvent) -> Void)?
+    /// 点击某个模块时回调；nil 表示点在空白 / 内外边距区域
+    var onSegmentClick: ((SegmentKind?) -> Void)?
     var onRightClick: ((NSEvent) -> Void)?
 
     /// 仅用于离屏截图自检
@@ -73,8 +93,10 @@ final class StatusItemView: NSView {
     private var isHovered = false
     private var trackingAreaRef: NSTrackingArea?
     private var cachedLayout: [SegmentLayout] = []
+    private var hitViews: [SegmentHitView] = []
 
     private struct SegmentLayout {
+        let kind: SegmentKind?
         let label: StatusSegment.Label
         let labelWidth: CGFloat
         let lines: [String]
@@ -164,6 +186,7 @@ final class StatusItemView: NSView {
             let templateWidths = segment.templates.map { width($0, font: font) }
             let textPart = max(lineWidths.max() ?? 0, templateWidths.max() ?? 0)
             return SegmentLayout(
+                kind: segment.kind,
                 label: segment.label,
                 labelWidth: labelWidth(segment.label),
                 lines: segment.lines,
@@ -183,6 +206,37 @@ final class StatusItemView: NSView {
         return ceil(max(22, total))
     }
 
+    /// 自检：直接用 AppKit 做命中测试，验证点击会落到哪个分段
+    func debugHitKinds() -> String {
+        stride(from: 2.0, to: bounds.width, by: 24.0).map { x in
+            let hit = hitTest(NSPoint(x: x, y: bounds.midY))
+            let kind: String
+            if let hitView = hit as? SegmentHitView {
+                kind = hitView.kind?.rawValue ?? "nil"
+            } else if hit === self {
+                kind = "self(空白)"
+            } else {
+                kind = "none"
+            }
+            return "\(Int(x)):\(kind)"
+        }.joined(separator: " ")
+    }
+
+    var debugHitViewCount: Int { hitViews.count }
+
+    /// 自检：返回每个分段对应的点击区间
+    func debugSegmentRects() -> [(String, NSRect)] {
+        var x = style.padding
+        var result: [(String, NSRect)] = []
+        for (index, item) in cachedLayout.enumerated() {
+            if index > 0 { x += style.spacing }
+            result.append((item.kind?.rawValue ?? "nil",
+                           NSRect(x: x, y: 0, width: item.slot, height: bounds.height)))
+            x += item.slot
+        }
+        return result
+    }
+
     /// 自检：给定分段时的总宽度
     func measuredWidth(for segments: [StatusSegment]) -> CGFloat {
         totalWidth(of: layout(segments))
@@ -198,8 +252,49 @@ final class StatusItemView: NSView {
         frame = NSRect(x: 0, y: 0, width: width, height: height)
         contentView.frame = bounds
         effectView?.frame = backgroundRect()
+        rebuildHitAreas()
         contentView.needsDisplay = true
         needsDisplay = true
+    }
+
+    /// 为每个分段铺设透明命中视图（AppKit 命中测试，不依赖事件坐标）
+    private func rebuildHitAreas() {
+        hitViews.forEach { $0.removeFromSuperview() }
+        hitViews.removeAll()
+
+        var x = style.padding
+        for (index, item) in cachedLayout.enumerated() {
+            if index > 0 { x += style.spacing }
+            let frame = NSRect(x: x, y: 0, width: max(1, item.slot), height: bounds.height)
+            let hitView = SegmentHitView(frame: frame)
+            hitView.kind = item.kind
+            hitView.onMouseDown = { [weak self] event in
+                self?.handleSegmentMouseDown(kind: item.kind, event: event)
+            }
+            addSubview(hitView)
+            hitViews.append(hitView)
+            x += item.slot
+        }
+    }
+
+    private func handleSegmentMouseDown(kind: SegmentKind?, event: NSEvent) {
+        if event.modifierFlags.contains(.control) || event.type == .rightMouseDown {
+            onRightClick?(event)
+            return
+        }
+        // 状态栏窗口里事件自带坐标并不可靠（实测恒为视图中心），
+        // 这里以真实光标位置为准重新判定一次。
+        let resolved = kindFromCursor() ?? kind
+        recordClick(event: event, kind: resolved)
+        onSegmentClick?(resolved)
+    }
+
+    /// 用真实光标位置（屏幕坐标）换算成状态栏内的横向位置
+    private func kindFromCursor() -> SegmentKind? {
+        guard let window = self.window else { return nil }
+        let screenX = NSEvent.mouseLocation.x
+        let viewInScreen = window.convertToScreen(convert(bounds, to: nil))
+        return segmentKind(atX: screenX - viewInScreen.minX)
     }
 
     override func layout() {
@@ -374,8 +469,70 @@ final class StatusItemView: NSView {
     override func mouseDown(with event: NSEvent) {
         if event.modifierFlags.contains(.control) {
             onRightClick?(event)
+            return
+        }
+        // 只有点击落在分段之间的空白/内边距时才会走到这里
+        let kind = kindFromCursor() ?? segmentKind(atX: viewCoordinateX(for: event))
+        recordClick(event: event, kind: kind)
+        onSegmentClick?(kind)
+    }
+
+    /// 用屏幕坐标换算点击位置，避免状态栏窗口内边距带来的坐标偏移
+    private func viewCoordinateX(for event: NSEvent) -> CGFloat {
+        guard let window = self.window else {
+            return convert(event.locationInWindow, from: nil).x
+        }
+        let screenPoint = window.convertPoint(toScreen: event.locationInWindow)
+        let viewInWindow = convert(bounds, to: nil)
+        let viewInScreen = window.convertToScreen(viewInWindow)
+        return screenPoint.x - viewInScreen.minX
+    }
+
+    /// 命中测试：菜单栏是一维的，只比较横向位置。
+    /// 纵向不参与判断（状态栏窗口比视图高，点击可能落在视图上下边界之外）。
+    private func segmentKind(atX rawX: CGFloat) -> SegmentKind? {
+        guard !cachedLayout.isEmpty else { return nil }
+
+        let clamped = min(max(rawX, 0), bounds.width)
+        var x = style.padding
+
+        for (index, item) in cachedLayout.enumerated() {
+            if index > 0 { x += style.spacing }
+            let maxX = x + item.slot
+            if clamped >= x && clamped < maxX {
+                return item.kind
+            }
+            x = maxX
+        }
+
+        // 落在左右边缘留白里，归为最近的一段
+        if clamped >= x { return cachedLayout.last?.kind }
+        if clamped < style.padding { return cachedLayout.first?.kind }
+        return nil
+    }
+
+    /// 临时诊断：把每次点击的坐标与命中结果写入 /tmp/clipstats-clicks.log
+    private func recordClick(event: NSEvent, kind: SegmentKind?) {
+        guard ProcessInfo.processInfo.environment["CLIPSTATS_DIAG"] == "1" else { return }
+        let frames = debugSegmentRects()
+            .map { "\($0.0):[\(Int($0.1.minX))-\(Int($0.1.maxX))]" }
+            .joined(separator: ",")
+        let screenX = NSEvent.mouseLocation.x
+        let viewInScreen = window.map { $0.convertToScreen(convert(bounds, to: nil)) }
+        let localX = viewInScreen.map { screenX - $0.minX } ?? -999
+        let line = "\(Date()) kind=\(kind?.rawValue ?? "nil") "
+            + "localX=\(String(format: "%.1f", localX)) mouseX=\(String(format: "%.1f", screenX)) "
+            + "viewScreenMinX=\(String(format: "%.1f", viewInScreen?.minX ?? -1)) "
+            + "bounds=\(bounds.size)\n    frames=\(frames)\n"
+
+        guard let data = line.data(using: .utf8) else { return }
+        let url = URL(fileURLWithPath: "/tmp/clipstats-clicks.log")
+        if let handle = try? FileHandle(forWritingTo: url) {
+            handle.seekToEndOfFile()
+            handle.write(data)
+            try? handle.close()
         } else {
-            onLeftClick?(event)
+            try? data.write(to: url)
         }
     }
 
@@ -400,7 +557,8 @@ final class StatusBarController {
     private var snapshot = MetricsSnapshot()
     private var clipboardCount = 0
 
-    var onTogglePanel: ((NSRect) -> Void)?
+    /// 点击状态栏分段：kind 为命中的模块（nil = 空白区域），anchor 为状态栏项在屏幕上的位置
+    var onSegmentClick: ((SegmentKind?, NSRect) -> Void)?
 
     init(settingsStore: SettingsStore, menuProvider: @escaping (NSEvent) -> NSMenu?) {
         self.settingsStore = settingsStore
@@ -410,10 +568,10 @@ final class StatusBarController {
         view.statusItem = statusItem
         view.style = Self.makeStyle(settingsStore.settings)
 
-        view.onLeftClick = { [weak self] _ in
+        view.onSegmentClick = { [weak self] kind in
             guard let self else { return }
             let anchor = self.view.window?.frame ?? .zero
-            self.onTogglePanel?(anchor)
+            self.onSegmentClick?(kind, anchor)
         }
         let localView = view
         view.onRightClick = { event in
@@ -498,7 +656,7 @@ final class StatusBarController {
                 }
             }
 
-            segments.append(StatusSegment(label: label, lines: lines, templates: templates))
+            segments.append(StatusSegment(kind: config.kind, label: label, lines: lines, templates: templates))
         }
 
         if segments.isEmpty {
