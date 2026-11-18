@@ -332,6 +332,16 @@ final class ClipboardStore {
         execute("DELETE FROM items;")
     }
 
+    /// 只清空某一类记录（文本 / 图片 / 文件）
+    func clear(kind: Kind) {
+        lock.lock()
+        defer { lock.unlock() }
+        guard let statement = prepare("DELETE FROM items WHERE kind = ?") else { return }
+        defer { sqlite3_finalize(statement) }
+        sqlite3_bind_text(statement, 1, kind.rawValue, -1, Self.transient)
+        sqlite3_step(statement)
+    }
+
     func trim(maxItems: Int) {
         lock.lock()
         defer { lock.unlock() }

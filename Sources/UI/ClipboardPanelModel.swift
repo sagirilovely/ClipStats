@@ -61,7 +61,8 @@ final class ClipboardPanelModel: ObservableObject {
     var onSwitchToRunningApps: (() -> Void)?
     var onRequestQuit: (() -> Void)?
     var onTogglePause: ((Bool) -> Void)?
-    var onClearAll: (() -> Void)?
+    /// 清空记录后通知外部（用于刷新状态栏里的历史条数）
+    var onHistoryCleared: (() -> Void)?
 
     private let store = ClipboardStore.shared
 
@@ -126,9 +127,20 @@ final class ClipboardPanelModel: ObservableObject {
         reload()
     }
 
-    func clearAll() {
-        onClearAll?()
+    /// 「全部」tab 下清空所有；其余 tab 只清空当前类型
+    func clearCurrentScope() {
+        if let kind = selectedFilter.storeKind {
+            store.clear(kind: kind)
+        } else {
+            store.clear()
+        }
         reload()
+        onHistoryCleared?()
+    }
+
+    /// 清空按钮的文案随当前 tab 变化
+    var clearButtonTitle: String {
+        selectedFilter == .all ? "清空" : "清空\(selectedFilter.rawValue)"
     }
 
     func togglePause() {

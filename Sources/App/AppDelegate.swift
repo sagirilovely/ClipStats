@@ -73,9 +73,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         model.onTogglePause = { [weak self] paused in
             self?.store.set { $0.clipboardPaused = paused }
         }
-        model.onClearAll = { [weak self] in
-            ClipboardStore.shared.clear()
-            self?.statusBar.updateClipboardCount(0)
+        model.onHistoryCleared = { [weak self] in
+            self?.statusBar.updateClipboardCount(ClipboardStore.shared.count())
         }
 
         engine.onUpdate = { [weak self] snapshot in

@@ -233,11 +233,11 @@ struct ClipboardPanelView: View {
 
             Spacer()
 
-            // 清空按钮
+            // 清空按钮：只在「全部」下清空全部，其它 tab 只清当前类型
             Button {
-                model.clearAll()
+                model.clearCurrentScope()
             } label: {
-                Text("清空")
+                Text(model.clearButtonTitle)
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(.primary.opacity(0.86))
             }
