@@ -1,0 +1,11 @@
+# 构建产物
+build/
+.build/
+
+# 生成的图标集（由 scripts/make-icon.swift 生成，AppIcon.icns 已提交）
+Resources/AppIcon.iconset/
+
+# IDE / 系统
+.idea/
+.DS_Store
+*.swiftmodule
