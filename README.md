@@ -31,12 +31,31 @@ swift --version             # 应输出 Swift 6.x
 ## 构建
 
 ```bash
-make build     # 只编译二进制到 build/ClipStats
-make bundle    # 组装 build/ClipStats.app 并 ad-hoc 签名
-make run       # 重新构建、打包并启动（开发用）
-make install   # 安装到 /Applications 并启动
-make clean     # 清理
+make build        # 只编译二进制到 build/ClipStats
+make bundle       # 组装 build/ClipStats.app 并 ad-hoc 签名
+make run          # 重新构建、打包并启动（开发用）
+make install      # 安装到 /Applications 并启动
+make package      # 生成发布产物 dist/ClipStats-<版本>-macos-<架构>.zip（可用 ARCH=universal）
+make icon         # 由 scripts/make-icon.swift 重新生成 AppIcon.icns
+make clean        # 清理
 ```
+
+## 下载安装包
+
+每次推送 `v*` 形式的 tag，GitHub Actions 会自动在 macOS 上构建通用二进制并发布到
+[Releases](https://github.com/sagirilovely/ClipStats/releases)：
+
+- `ClipStats-<版本>-macos-universal.zip` —— 通用二进制（Apple Silicon + Intel），解压即用
+- `ClipStats-<版本>-macos-universal.dmg` —— 拖拽安装
+- `SHA256SUMS.txt` —— 校验和
+
+> 应用是 **ad-hoc 签名**（没有 Apple 开发者证书），从浏览器下载后首次打开会被 Gatekeeper 拦截，提示
+> “无法打开，因为无法验证开发者”或“已损坏”。任选一种方式打开：
+>
+> 1. 在 Finder 里**右键点击 App → 打开**，再在弹窗里点“打开”；
+> 2. 或执行 `xattr -dr com.apple.quarantine /Applications/ClipStats.app`。
+>
+> 想彻底消除提示需要 Apple Developer Program（$99/年）做 Developer ID 签名 + 公证。
 
 ## 功能
 
@@ -84,6 +103,23 @@ make clean     # 清理
 温度采用**运行时动态枚举**而非硬编码键表：不同芯片 / 系统版本的 SMC 键名并不一致
 （例如本机 macOS 27 + M1 上并不存在常见 M1 键表中的 `Tp01`/`Tg05`，实际是 `Tp2x…Tp9z` 等）。
 所有读取都做了失败降级：读不到就显示 `--`，不会崩溃。
+
+## 发布流程
+
+```bash
+# 1. 改版本号
+/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 0.2.0" Resources/Info.plist
+/usr/libexec/PlistBuddy -c "Set :CFBundleVersion 2" Resources/Info.plist
+
+# 2. 提交并打 tag
+git commit -am "release: v0.2.0"
+git tag v0.2.0
+git push origin main --tags
+```
+
+推送 tag 后 `.github/workflows/release.yml` 会在 `macos-15` 上执行 `ARCH=universal ./scripts/package.sh`，
+并调用 `gh release create` 把 zip / dmg / 校验和上传到 Releases。
+另有 `.github/workflows/build.yml` 在每次推送 main 时做一次编译验证。
 
 ## 开源许可
 

@@ -6,9 +6,10 @@ BIN       := $(BUILD_DIR)/$(APP_NAME)
 
 SOURCES := $(shell find Sources -name '*.swift')
 SWIFTC  := swiftc
-FLAGS   := -O -swift-version 5 -module-cache-path $(BUILD_DIR)/mcache -target arm64-apple-macos13.0
+ARCH    ?= $(shell uname -m)
+FLAGS   := -O -swift-version 5 -module-cache-path $(BUILD_DIR)/mcache -target $(ARCH)-apple-macos13.0
 
-.PHONY: all bundle build run install uninstall clean icon
+.PHONY: all build bundle run install uninstall package dmg clean icon
 
 all: bundle
 
@@ -42,8 +43,16 @@ uninstall:
 	@pkill -f '$(APP_NAME).app/Contents/MacOS' 2>/dev/null || true
 	@rm -rf /Applications/$(APP_NAME).app
 
+# 生成发布产物（默认通用二进制）：dist/ClipStats-<版本>-macos-<架构>.{zip,dmg}
+package:
+	@ARCH=$(ARCH) ./scripts/package.sh
+
 clean:
 	@rm -rf $(BUILD_DIR)
 
 icon:
-	@$(MAKE) -s -f Makefile icon-internal || true
+	@mkdir -p $(BUILD_DIR)
+	@$(SWIFTC) -module-cache-path $(BUILD_DIR)/mcache scripts/make-icon.swift -o $(BUILD_DIR)/make-icon
+	@$(BUILD_DIR)/make-icon Resources
+	@iconutil -c icns Resources/AppIcon.iconset -o Resources/AppIcon.icns
+	@echo "icon rebuilt: Resources/AppIcon.icns"
