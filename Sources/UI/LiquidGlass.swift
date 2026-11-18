@@ -311,7 +311,8 @@ struct LiquidGlassIconButtonStyle: ButtonStyle {
         configuration.label
             .font(.system(size: 11.5, weight: .medium))
             .foregroundStyle(Color.primary.opacity(0.82))
-            .frame(width: 27, height: 27)
+            .frame(width: 29, height: 29)
+            .contentShape(Circle())
             .background(
                 Circle()
                     .fill(Color(nsColor: .controlBackgroundColor).opacity(colorScheme == .dark ? 0.48 : 0.48))

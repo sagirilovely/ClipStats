@@ -48,6 +48,8 @@ struct ClipboardPanelView: View {
                         Image(systemName: "xmark.circle.fill")
                             .font(.system(size: 12))
                             .foregroundStyle(.secondary)
+                            .padding(4)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                 }
@@ -114,6 +116,8 @@ struct ClipboardPanelView: View {
                         lineWidth: 0.8
                     )
             )
+            // 未选中时胶囊是透明的，只有 glyph 能命中；contentShape 让整块可点
+            .contentShape(Capsule())
             .foregroundStyle(isSelected ? Color.primary : Color.secondary)
         }
         .buttonStyle(.plain)

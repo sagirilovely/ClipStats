@@ -100,6 +100,8 @@ struct SettingsView: View {
                         lineWidth: 0.8
                     )
             )
+            // 未选中时背景透明，补一个与视觉一致的命中区域
+            .contentShape(Capsule())
             .foregroundStyle(isSelected ? Color.primary : Color.secondary)
         }
         .buttonStyle(.plain)
@@ -446,6 +448,7 @@ struct SettingsView: View {
             .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
             .frame(width: 112, height: 32)
             .liquidGlassControl(cornerRadius: 10, isActive: isSelected)
+            .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         }
         .buttonStyle(.plain)
     }
