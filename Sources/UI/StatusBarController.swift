@@ -233,19 +233,29 @@ final class StatusItemView: NSView {
             style.backgroundColor.setFill()
             path.fill()
         case .glass:
-            NSColor.black.withAlphaComponent(0.06).setFill()
-            path.fill()
-            NSColor.white.withAlphaComponent(0.14).setStroke()
-            path.lineWidth = 1
+            if let gradient = NSGradient(starting: NSColor.white.withAlphaComponent(0.16),
+                                         ending: NSColor.white.withAlphaComponent(0.04)) {
+                gradient.draw(in: path, angle: -90)
+            } else {
+                NSColor.white.withAlphaComponent(0.08).setFill()
+                path.fill()
+            }
+            NSColor.white.withAlphaComponent(0.28).setStroke()
+            path.lineWidth = 0.8
             path.stroke()
         }
     }
 
     private func drawContent() {
         if isHovered || isPanelOpen {
-            NSColor.labelColor.withAlphaComponent(isPanelOpen ? 0.22 : 0.12).setFill()
-            NSBezierPath(roundedRect: backgroundRect(), xRadius: style.cornerRadius,
-                         yRadius: style.cornerRadius).fill()
+            let rect = backgroundRect()
+            let path = NSBezierPath(roundedRect: rect, xRadius: style.cornerRadius, yRadius: style.cornerRadius)
+            let alpha: CGFloat = isPanelOpen ? 0.22 : 0.12
+            NSColor.labelColor.withAlphaComponent(alpha).setFill()
+            path.fill()
+            NSColor.white.withAlphaComponent(isPanelOpen ? 0.32 : 0.18).setStroke()
+            path.lineWidth = 0.8
+            path.stroke()
         }
 
         if cachedLayout.count != segments.count {

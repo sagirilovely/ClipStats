@@ -15,27 +15,32 @@ final class ClipboardPanelController: NSObject, NSWindowDelegate {
     var onVisibilityChange: ((Bool) -> Void)?
     var panelHeight: CGFloat = 470
 
+    private let panelWidth: CGFloat = 390
+
     func show(anchor: NSRect) {
         let panel = ensurePanel()
+        model.searchText = ""
         model.reload()
 
-        let size = NSSize(width: 380, height: panelHeight)
-        var origin = NSPoint(x: anchor.midX - size.width / 2, y: anchor.minY - size.height - 6)
+        let size = NSSize(width: panelWidth, height: panelHeight)
+        var origin = NSPoint(x: anchor.midX - size.width / 2, y: anchor.minY - size.height - 8)
         let screen = NSScreen.screens.first { $0.frame.contains(NSPoint(x: anchor.midX, y: anchor.midY)) }
             ?? NSScreen.main
         if let visible = screen?.visibleFrame {
             origin.x = min(max(visible.minX + 8, origin.x), visible.maxX - size.width - 8)
             if origin.y < visible.minY + 8 {
-                origin.y = anchor.maxY + 6
+                origin.y = anchor.maxY + 8
             }
         }
         panel.setFrameOrigin(origin)
+        panel.invalidateShadow()
 
         NSApp.activate(ignoringOtherApps: true)
         panel.makeKeyAndOrderFront(nil)
         model.requestFocus()
         DispatchQueue.main.async { [weak self] in
             self?.model.requestFocus()
+            self?.panel?.invalidateShadow()
         }
         installMonitors()
         onVisibilityChange?(true)
@@ -62,13 +67,14 @@ final class ClipboardPanelController: NSObject, NSWindowDelegate {
     func applyHeight(_ height: CGFloat) {
         panelHeight = height
         model.panelHeight = height
-        panel?.setContentSize(NSSize(width: 380, height: height))
+        panel?.setContentSize(NSSize(width: panelWidth, height: height))
+        panel?.invalidateShadow()
     }
 
     private func ensurePanel() -> ClipboardPanel {
         if let panel { return panel }
         let panel = ClipboardPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 380, height: panelHeight),
+            contentRect: NSRect(x: 0, y: 0, width: panelWidth, height: panelHeight),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
@@ -83,9 +89,12 @@ final class ClipboardPanelController: NSObject, NSWindowDelegate {
         panel.delegate = self
         model.panelHeight = panelHeight
         let hosting = NSHostingController(rootView: ClipboardPanelView(model: model))
-        hosting.view.frame = NSRect(x: 0, y: 0, width: 380, height: panelHeight)
+        hosting.view.frame = NSRect(x: 0, y: 0, width: panelWidth, height: panelHeight)
+        hosting.view.wantsLayer = true
+        hosting.view.layer?.backgroundColor = NSColor.clear.cgColor
         panel.contentViewController = hosting
-        panel.setContentSize(NSSize(width: 380, height: panelHeight))
+        panel.setContentSize(NSSize(width: panelWidth, height: panelHeight))
+        panel.invalidateShadow()
         self.panel = panel
         return panel
     }

@@ -7,40 +7,130 @@ struct SettingsView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            tabBar
-            Divider()
-            content
+            topNavBar
+            liquidDivider
+            contentArea
         }
-        .frame(width: 720, height: 600)
-        .background(Color(nsColor: .windowBackgroundColor))
+        .frame(width: 760, height: 620)
+        .background(
+            ZStack {
+                // 底层桌面毛玻璃
+                VisualEffectView(material: .sidebar, blendingMode: .behindWindow, state: .active)
+                Color(nsColor: .windowBackgroundColor).opacity(0.35)
+                LiquidGlassStyle.surfaceGloss
+            }
+        )
         .onAppear { viewModel.refreshCount() }
         .onDisappear { viewModel.stopRecording() }
     }
 
-    private var tabBar: some View {
-        HStack(spacing: 4) {
-            ForEach(SettingsTab.allCases) { tab in
-                Button {
-                    viewModel.tab = tab
-                } label: {
-                    Text(tab.rawValue)
-                        .font(.system(size: 12, weight: viewModel.tab == tab ? .semibold : .regular))
-                        .foregroundStyle(viewModel.tab == tab ? Color.primary : Color.secondary)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 5)
-                        .background(viewModel.tab == tab ? Color.primary.opacity(0.1) : Color.clear)
-                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+    // MARK: - 顶部液态导航栏
+
+    private var topNavBar: some View {
+        HStack(spacing: 12) {
+            // 应用徽标与标题
+            HStack(spacing: 8) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.blue.opacity(0.85), Color.purple.opacity(0.85)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 22, height: 22)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                .strokeBorder(Color.white.opacity(0.3), lineWidth: 0.8)
+                        )
+                    Image(systemName: "doc.on.clipboard.fill")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(.white)
                 }
-                .buttonStyle(.plain)
+
+                Text("ClipStats")
+                    .font(.system(size: 13, weight: .semibold))
             }
+
+            Spacer()
+
+            // 居中/右侧液态玻璃分段选项卡
+            HStack(spacing: 3) {
+                ForEach(SettingsTab.allCases) { tab in
+                    tabButton(tab)
+                }
+            }
+            .padding(3)
+            .background(Color.primary.opacity(0.04))
+            .clipShape(Capsule())
+            .overlay(
+                Capsule().strokeBorder(Color.white.opacity(0.16), lineWidth: 0.8)
+            )
+
             Spacer()
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
     }
 
+    private func tabButton(_ tab: SettingsTab) -> some View {
+        let isSelected = viewModel.tab == tab
+        return Button {
+            withAnimation(.easeInOut(duration: 0.16)) {
+                viewModel.tab = tab
+            }
+        } label: {
+            HStack(spacing: 5) {
+                Image(systemName: tab.icon)
+                    .font(.system(size: 10.5))
+                Text(tab.rawValue)
+                    .font(.system(size: 11.5, weight: isSelected ? .medium : .regular))
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(
+                ZStack {
+                    if isSelected {
+                        Capsule()
+                            .fill(Color.primary.opacity(0.12))
+                        LiquidGlassStyle.surfaceGloss
+                    }
+                }
+            )
+            .clipShape(Capsule())
+            .overlay(
+                Capsule()
+                    .strokeBorder(
+                        isSelected ? Color.white.opacity(0.28) : Color.clear,
+                        lineWidth: 0.8
+                    )
+            )
+            .foregroundStyle(isSelected ? Color.primary : Color.secondary)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var liquidDivider: some View {
+        Rectangle()
+            .fill(
+                LinearGradient(
+                    colors: [
+                        Color.white.opacity(0.02),
+                        Color.white.opacity(0.22),
+                        Color.white.opacity(0.02)
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+            )
+            .frame(height: 1)
+    }
+
+    // MARK: - 主内容区
+
     @ViewBuilder
-    private var content: some View {
+    private var contentArea: some View {
         switch viewModel.tab {
         case .statusBar: statusBarTab
         case .appearance: appearanceTab
@@ -51,57 +141,82 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - 状态栏
+    // MARK: - 状态栏页签
 
     private var statusBarTab: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            previewBar
-            Text("拖拽或使用上下箭头调整顺序；关闭开关即可隐藏该模块。")
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
-
-            List {
-                ForEach(Array(store.settings.segments.enumerated()), id: \.element.kind) { index, segment in
-                    segmentRow(index: index, segment: segment)
-                }
-                .onMove { store.moveSegment(from: $0, to: $1) }
-            }
-
-            HStack(spacing: 16) {
-                Toggle("CPU 数值后附带温度", isOn: binding(\.showCPUWithTemperature))
-                Toggle("开机自动启动", isOn: binding(\.launchAtLogin))
-            }
-            .font(.system(size: 12))
-
-            HStack(spacing: 8) {
-                Text("温度取值").font(.system(size: 12))
-                Picker("", selection: binding(\.temperatureMode)) {
-                    ForEach(TemperatureMode.allCases) { mode in
-                        Text(mode.rawValue).tag(mode)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                // 实时预览卡片
+                GlassCard(title: "状态栏实时预览", icon: "sparkles", tint: .blue) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        previewBar
+                        Text("预览反映当前选中的模块、标签模式及排序；关闭开关即可在状态栏中隐藏。")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
                     }
                 }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .frame(width: 160)
-                Text("平均值更平滑，最高值反映最热传感器")
-                    .font(.system(size: 10.5))
-                    .foregroundStyle(.secondary)
-                Spacer()
-            }
 
-            HStack(spacing: 8) {
-                Text("字号").font(.system(size: 12))
-                Slider(value: binding(\.barFontSize), in: 10...16, step: 1)
-                    .frame(width: 160)
-                Text("\(Int(store.settings.barFontSize)) pt")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-                Spacer()
+                // 模块排序与开关
+                GlassCard(title: "监控模块与排序", icon: "list.bullet.indent", tint: .indigo) {
+                    VStack(spacing: 6) {
+                        ForEach(Array(store.settings.segments.enumerated()), id: \.element.kind) { index, segment in
+                            segmentRow(index: index, segment: segment)
+                            if index < store.settings.segments.count - 1 {
+                                Divider().opacity(0.3)
+                            }
+                        }
+                    }
+                }
+
+                // 显示偏好
+                GlassCard(title: "显示配置", icon: "slider.horizontal.3", tint: .teal) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack(spacing: 24) {
+                            Toggle("CPU 数值附带温度", isOn: binding(\.showCPUWithTemperature))
+                            Toggle("开机自动启动", isOn: binding(\.launchAtLogin))
+                        }
+                        .font(.system(size: 12))
+
+                        Divider().opacity(0.3)
+
+                        HStack(spacing: 12) {
+                            Text("温度取值")
+                                .font(.system(size: 12))
+                                .frame(width: 80, alignment: .leading)
+                            Picker("", selection: binding(\.temperatureMode)) {
+                                ForEach(TemperatureMode.allCases) { mode in
+                                    Text(mode.rawValue).tag(mode)
+                                }
+                            }
+                            .pickerStyle(.segmented)
+                            .labelsHidden()
+                            .frame(width: 170)
+
+                            Text("平均值更平滑，最高值反映最热核心")
+                                .font(.system(size: 11))
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                        }
+
+                        HStack(spacing: 12) {
+                            Text("字号大小")
+                                .font(.system(size: 12))
+                                .frame(width: 80, alignment: .leading)
+                            Slider(value: binding(\.barFontSize), in: 10...16, step: 1)
+                                .frame(width: 170)
+                            Text("\(Int(store.settings.barFontSize)) pt")
+                                .font(.system(size: 11, design: .monospaced))
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color.primary.opacity(0.06))
+                                .clipShape(Capsule())
+                            Spacer()
+                        }
+                    }
+                }
             }
+            .padding(18)
         }
-        .padding(.horizontal, 16)
-        .padding(.top, 10)
-        .padding(.bottom, 14)
     }
 
     private func segmentRow(index: Int, segment: SegmentConfig) -> some View {
@@ -111,12 +226,18 @@ struct SettingsView: View {
                 .toggleStyle(.switch)
                 .controlSize(.mini)
 
-            Image(systemName: segment.kind.symbolName)
-                .frame(width: 18)
-                .foregroundStyle(segment.enabled ? Color.primary : Color.secondary)
+            ZStack {
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(segment.enabled ? Color.blue.opacity(0.15) : Color.primary.opacity(0.05))
+                    .frame(width: 26, height: 26)
+                Image(systemName: segment.kind.symbolName)
+                    .font(.system(size: 12))
+                    .foregroundStyle(segment.enabled ? Color.blue : Color.secondary)
+            }
 
-            VStack(alignment: .leading, spacing: 1) {
-                Text(segment.kind.title).font(.system(size: 12.5))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(segment.kind.title)
+                    .font(.system(size: 12.5, weight: .medium))
                 Text(segment.kind.detail)
                     .font(.system(size: 10.5))
                     .foregroundStyle(.secondary)
@@ -131,22 +252,31 @@ struct SettingsView: View {
             }
             .labelsHidden()
             .pickerStyle(.menu)
-            .frame(width: 76)
+            .frame(width: 82)
 
             Toggle("数值", isOn: binding(\.segments[index].showText))
                 .toggleStyle(.checkbox)
                 .controlSize(.small)
 
-            VStack(spacing: 2) {
+            HStack(spacing: 4) {
                 Button { move(index, by: -1) } label: {
-                    Image(systemName: "chevron.up").font(.system(size: 9))
+                    Image(systemName: "chevron.up")
+                        .font(.system(size: 9, weight: .bold))
+                        .padding(5)
+                        .background(Color.primary.opacity(0.05))
+                        .clipShape(Circle())
                 }
-                .buttonStyle(.borderless)
+                .buttonStyle(.plain)
                 .disabled(index == 0)
+
                 Button { move(index, by: 1) } label: {
-                    Image(systemName: "chevron.down").font(.system(size: 9))
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 9, weight: .bold))
+                        .padding(5)
+                        .background(Color.primary.opacity(0.05))
+                        .clipShape(Circle())
                 }
-                .buttonStyle(.borderless)
+                .buttonStyle(.plain)
                 .disabled(index >= store.settings.segments.count - 1)
             }
         }
@@ -155,8 +285,11 @@ struct SettingsView: View {
 
     private var previewBar: some View {
         HStack(spacing: 12) {
-            Text("预览").font(.system(size: 10)).foregroundStyle(.secondary)
-            HStack(spacing: 12) {
+            Text("菜单栏效果")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(.secondary)
+
+            HStack(spacing: 10) {
                 ForEach(store.settings.segments.filter { $0.enabled }) { segment in
                     HStack(spacing: 4) {
                         switch segment.labelMode {
@@ -174,10 +307,17 @@ struct SettingsView: View {
                     }
                 }
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 4)
-            .background(Color.primary.opacity(0.08))
-            .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+            .padding(.horizontal, 12)
+            .padding(.vertical, 5)
+            .background(
+                ZStack {
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(Color.black.opacity(0.2))
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .strokeBorder(Color.white.opacity(0.18), lineWidth: 0.8)
+                }
+            )
+
             Spacer()
         }
     }
@@ -193,108 +333,118 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - 外观
+    // MARK: - 外观页签
 
     private var appearanceTab: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                sectionTitle("尺寸与间距")
-                sliderRow("字号", value: binding(\.barFontSize), range: 10...16, step: 1, suffix: "pt")
-                sliderRow("图标大小", value: binding(\.appearance.iconPointSize), range: 8...18, step: 1, suffix: "pt")
-                sliderRow("列间距", value: binding(\.appearance.segmentSpacing), range: 0...20, step: 1, suffix: "pt")
-                sliderRow("左右边距", value: binding(\.appearance.horizontalPadding), range: 0...20, step: 1, suffix: "pt")
+                GlassCard(title: "尺寸与布局", icon: "ruler.fill", tint: .purple) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        sliderRow("字号大小", value: binding(\.barFontSize), range: 10...16, step: 1, suffix: "pt")
+                        sliderRow("图标大小", value: binding(\.appearance.iconPointSize), range: 8...18, step: 1, suffix: "pt")
+                        sliderRow("模块间距", value: binding(\.appearance.segmentSpacing), range: 0...20, step: 1, suffix: "pt")
+                        sliderRow("左右内边距", value: binding(\.appearance.horizontalPadding), range: 0...20, step: 1, suffix: "pt")
 
-                HStack(spacing: 10) {
-                    Text("数值对齐").font(.system(size: 12)).frame(width: 72, alignment: .leading)
-                    Picker("", selection: binding(\.appearance.textAlignment)) {
-                        ForEach(BarTextAlignment.allCases) { Text($0.rawValue).tag($0) }
+                        Divider().opacity(0.3)
+
+                        HStack(spacing: 12) {
+                            Text("数值对齐")
+                                .font(.system(size: 12))
+                                .frame(width: 80, alignment: .leading)
+                            Picker("", selection: binding(\.appearance.textAlignment)) {
+                                ForEach(BarTextAlignment.allCases) { Text($0.rawValue).tag($0) }
+                            }
+                            .pickerStyle(.segmented)
+                            .labelsHidden()
+                            .frame(width: 170)
+                            Spacer()
+                        }
+
+                        HStack(spacing: 12) {
+                            Text("网速布局")
+                                .font(.system(size: 12))
+                                .frame(width: 80, alignment: .leading)
+                            Picker("", selection: binding(\.networkVertical)) {
+                                Text("左右").tag(false)
+                                Text("上下").tag(true)
+                            }
+                            .pickerStyle(.segmented)
+                            .labelsHidden()
+                            .frame(width: 170)
+                            Text("上下排列（上传在上、下载在下）更省横向空间")
+                                .font(.system(size: 10.5))
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                        }
+
+                        Toggle("固定槽位宽度（数值变动时不抖动）", isOn: binding(\.stabilizeBarWidth))
+                            .font(.system(size: 12))
                     }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
-                    .frame(width: 160)
-                    Spacer()
                 }
 
-                HStack(spacing: 10) {
-                    Text("网速布局").font(.system(size: 12)).frame(width: 72, alignment: .leading)
-                    Picker("", selection: binding(\.networkVertical)) {
-                        Text("左右").tag(false)
-                        Text("上下").tag(true)
+                GlassCard(title: "状态栏背景", icon: "paintpalette.fill", tint: .pink) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack(spacing: 12) {
+                            Text("背景样式")
+                                .font(.system(size: 12))
+                                .frame(width: 80, alignment: .leading)
+                            Picker("", selection: binding(\.appearance.backgroundStyle)) {
+                                ForEach(BarBackgroundStyle.allCases) { Text($0.rawValue).tag($0) }
+                            }
+                            .pickerStyle(.segmented)
+                            .labelsHidden()
+                            .frame(width: 220)
+                            Spacer()
+                        }
+
+                        if store.settings.appearance.backgroundStyle != .none {
+                            ColorPicker("背景颜色", selection: colorBinding(\.appearance.backgroundColor), supportsOpacity: false)
+                                .font(.system(size: 12))
+
+                            if store.settings.appearance.backgroundStyle == .solid {
+                                sliderRow("不透明度", value: binding(\.appearance.backgroundOpacity),
+                                          range: 0.05...1, step: 0.05, suffix: "", format: "%.2f")
+                            }
+                            sliderRow("背景圆角", value: binding(\.appearance.cornerRadius), range: 0...14, step: 1, suffix: "pt")
+                        }
                     }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
-                    .frame(width: 160)
-                    Text("上下排列（上传在上、下载在下）更省宽度")
-                        .font(.system(size: 10.5))
-                        .foregroundStyle(.secondary)
-                    Spacer()
                 }
 
-                Toggle("固定宽度（数值变化时不抖动）", isOn: binding(\.stabilizeBarWidth))
-                    .font(.system(size: 12))
-                Text("开启后每个模块按最大数值预留槽位；关掉则按实际内容自适应，但温度、网速变化时栏宽会跳动。")
-                    .font(.system(size: 10.5))
-                    .foregroundStyle(.secondary)
+                GlassCard(title: "文字色彩", icon: "character.textbox", tint: .cyan) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Toggle("自定义字体颜色", isOn: binding(\.appearance.useCustomTextColor))
+                            .font(.system(size: 12))
 
-                Divider()
-
-                sectionTitle("背景")
-                HStack(spacing: 10) {
-                    Text("样式").font(.system(size: 12)).frame(width: 72, alignment: .leading)
-                    Picker("", selection: binding(\.appearance.backgroundStyle)) {
-                        ForEach(BarBackgroundStyle.allCases) { Text($0.rawValue).tag($0) }
+                        if store.settings.appearance.useCustomTextColor {
+                            ColorPicker("字体颜色", selection: colorBinding(\.appearance.textColor), supportsOpacity: false)
+                                .font(.system(size: 12))
+                        } else {
+                            Text("关闭时自适应系统菜单栏（深浅色模式自动适配）。")
+                                .font(.system(size: 11))
+                                .foregroundStyle(.secondary)
+                        }
                     }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
-                    .frame(width: 240)
-                    Spacer()
                 }
-                if store.settings.appearance.backgroundStyle != .none {
-                    ColorPicker("背景颜色", selection: colorBinding(\.appearance.backgroundColor), supportsOpacity: false)
-                        .font(.system(size: 12))
-                    if store.settings.appearance.backgroundStyle == .solid {
-                        sliderRow("不透明度", value: binding(\.appearance.backgroundOpacity),
-                                  range: 0.05...1, step: 0.05, suffix: "", format: "%.2f")
-                    }
-                    sliderRow("圆角", value: binding(\.appearance.cornerRadius), range: 0...14, step: 1, suffix: "pt")
-                }
-
-                Divider()
-
-                sectionTitle("文字")
-                Toggle("自定义字体颜色", isOn: binding(\.appearance.useCustomTextColor))
-                    .font(.system(size: 12))
-                if store.settings.appearance.useCustomTextColor {
-                    ColorPicker("字体颜色", selection: colorBinding(\.appearance.textColor), supportsOpacity: false)
-                        .font(.system(size: 12))
-                } else {
-                    Text("关闭时跟随系统菜单栏颜色（深浅色自动适配）。")
-                        .font(.system(size: 10.5))
-                        .foregroundStyle(.secondary)
-                }
-
-                Spacer(minLength: 0)
             }
-            .padding(20)
+            .padding(18)
         }
-    }
-
-    private func sectionTitle(_ title: String) -> some View {
-        Text(title)
-            .font(.system(size: 12.5, weight: .semibold))
-            .foregroundStyle(.secondary)
     }
 
     private func sliderRow(_ title: String, value: Binding<Double>, range: ClosedRange<Double>,
                            step: Double, suffix: String, format: String? = nil) -> some View {
-        HStack(spacing: 10) {
-            Text(title).font(.system(size: 12)).frame(width: 72, alignment: .leading)
+        HStack(spacing: 12) {
+            Text(title)
+                .font(.system(size: 12))
+                .frame(width: 80, alignment: .leading)
             Slider(value: value, in: range, step: step)
                 .frame(width: 220)
             Text(String(format: format ?? "%.0f", value.wrappedValue) + suffix)
                 .font(.system(size: 11, design: .monospaced))
-                .foregroundStyle(.secondary)
-                .frame(width: 56, alignment: .leading)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(Color.primary.opacity(0.06))
+                .clipShape(Capsule())
+                .frame(width: 60, alignment: .leading)
             Spacer()
         }
     }
@@ -309,98 +459,154 @@ struct SettingsView: View {
         )
     }
 
-    // MARK: - 刷新频率
+    // MARK: - 刷新频率页签
 
     private var samplingTab: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            Text("采样间隔越小越实时，CPU 占用也越高。")
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                GlassCard(title: "采集刷新频率", icon: "gauge.with.needle.fill", tint: .orange) {
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text("采样间隔越短越平滑灵敏，CPU 占用也相应稍高。")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
 
-            intervalRow(title: "系统指标", detail: "CPU / GPU / 内存 / 网速",
-                        value: binding(\.metricsInterval), range: 0.5...10, step: 0.5)
-            intervalRow(title: "温度传感器", detail: "通过 SMC 读取，较耗资源",
-                        value: binding(\.thermalInterval), range: 1...30, step: 1)
-            intervalRow(title: "剪贴板轮询", detail: "检测到复制动作的延迟",
-                        value: binding(\.clipboardPollInterval), range: 0.2...2, step: 0.1)
+                        intervalRow(title: "系统核心指标", detail: "CPU / GPU / 内存 / 网速",
+                                    value: binding(\.metricsInterval), range: 0.5...10, step: 0.5)
+                        Divider().opacity(0.3)
+                        intervalRow(title: "温度传感器", detail: "通过 SMC 私有接口读取",
+                                    value: binding(\.thermalInterval), range: 1...30, step: 1)
+                        Divider().opacity(0.3)
+                        intervalRow(title: "剪贴板轮询", detail: "监测剪贴板复制事件的延迟",
+                                    value: binding(\.clipboardPollInterval), range: 0.2...2, step: 0.1)
+                    }
+                }
 
-            Spacer()
-
-            HStack {
-                Button("恢复默认设置") { store.resetToDefaults() }
-                Spacer()
+                Button {
+                    store.resetToDefaults()
+                } label: {
+                    Text("恢复默认频率设置")
+                        .font(.system(size: 12))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Color.primary.opacity(0.05))
+                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .strokeBorder(Color.white.opacity(0.15), lineWidth: 0.6)
+                        )
+                }
+                .buttonStyle(.plain)
             }
+            .padding(18)
         }
-        .padding(20)
     }
 
     private func intervalRow(title: String, detail: String, value: Binding<Double>,
                              range: ClosedRange<Double>, step: Double) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Text(title).font(.system(size: 13, weight: .medium))
+                Text(title).font(.system(size: 12.5, weight: .medium))
                 Spacer()
                 Text(String(format: "%.1f 秒", value.wrappedValue))
-                    .font(.system(size: 12, design: .monospaced))
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 11, design: .monospaced))
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 2)
+                    .background(Color.blue.opacity(0.12))
+                    .clipShape(Capsule())
+                    .foregroundStyle(Color.blue)
             }
             Text(detail).font(.system(size: 10.5)).foregroundStyle(.secondary)
             Slider(value: value, in: range, step: step)
-                .frame(maxWidth: 360, alignment: .leading)
+                .frame(maxWidth: 380)
         }
     }
 
-    // MARK: - 剪贴板
+    // MARK: - 剪贴板页签
 
     private var clipboardTab: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Toggle("记录剪贴板历史", isOn: binding(\.clipboardEnabled))
-                .font(.system(size: 13, weight: .medium))
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                GlassCard(title: "记录规则与安全", icon: "lock.shield.fill", tint: .green) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Toggle("记录剪贴板历史", isOn: binding(\.clipboardEnabled))
+                            .font(.system(size: 13, weight: .medium))
 
-            Toggle("跳过密码管理器和临时内容", isOn: binding(\.skipSensitive))
-                .font(.system(size: 12.5))
-            Text("识别 org.nspasteboard.ConcealedType 标记，1Password 等应用复制的内容不会被记录。")
-                .font(.system(size: 10.5))
-                .foregroundStyle(.secondary)
-
-            HStack(spacing: 10) {
-                Text("最多保留").font(.system(size: 12.5))
-                Stepper(value: binding(\.clipboardMaxItems), in: 20...5000, step: 20) {
-                    Text("\(store.settings.clipboardMaxItems) 条")
-                        .font(.system(size: 12, design: .monospaced))
+                        Toggle("跳过密码管理器和敏感临时内容", isOn: binding(\.skipSensitive))
+                            .font(.system(size: 12.5))
+                        Text("自动识别 org.nspasteboard.ConcealedType 标记，1Password、Bitwarden 等密码管理器复制的内容不会记录入库。")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    }
                 }
-                .frame(width: 180)
-            }
 
-            HStack(spacing: 10) {
-                Text("单张图片上限").font(.system(size: 12.5))
-                Stepper(value: imageSizeBinding, in: 1...50, step: 1) {
-                    Text("\(store.settings.maxImageBytes / (1024 * 1024)) MB")
-                        .font(.system(size: 12, design: .monospaced))
+                GlassCard(title: "存储配额", icon: "internaldrive.fill", tint: .blue) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack(spacing: 12) {
+                            Text("历史保留上限").font(.system(size: 12.5)).frame(width: 90, alignment: .leading)
+                            Stepper(value: binding(\.clipboardMaxItems), in: 20...5000, step: 20) {
+                                Text("\(store.settings.clipboardMaxItems) 条")
+                                    .font(.system(size: 12, design: .monospaced))
+                            }
+                            .frame(width: 180)
+                            Spacer()
+                        }
+
+                        HStack(spacing: 12) {
+                            Text("单张图片上限").font(.system(size: 12.5)).frame(width: 90, alignment: .leading)
+                            Stepper(value: imageSizeBinding, in: 1...50, step: 1) {
+                                Text("\(store.settings.maxImageBytes / (1024 * 1024)) MB")
+                                    .font(.system(size: 12, design: .monospaced))
+                            }
+                            .frame(width: 180)
+                            Spacer()
+                        }
+                    }
                 }
-                .frame(width: 180)
+
+                GlassCard(title: "历史数据管理", icon: "trash.fill", tint: .red) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack(spacing: 12) {
+                            Text("数据库当前包含")
+                                .font(.system(size: 12))
+                            Text("\(viewModel.clipboardCount) 条记录")
+                                .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 2)
+                                .background(Color.primary.opacity(0.06))
+                                .clipShape(Capsule())
+
+                            Button("刷新") { viewModel.refreshCount() }
+                                .font(.system(size: 11))
+                                .buttonStyle(.plain)
+                                .foregroundStyle(Color.accentColor)
+                        }
+
+                        Button {
+                            ClipboardStore.shared.clear()
+                            viewModel.refreshCount()
+                            NotificationCenter.default.post(name: .clipboardHistoryCleared, object: nil)
+                        } label: {
+                            HStack(spacing: 5) {
+                                Image(systemName: "trash")
+                                Text("清空全部剪贴板历史")
+                            }
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(Color.red)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(Color.red.opacity(0.08))
+                            .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                                    .strokeBorder(Color.red.opacity(0.25), lineWidth: 0.8)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
             }
-
-            HStack(spacing: 10) {
-                Text("当前记录：\(viewModel.clipboardCount) 条")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-                Button("刷新") { viewModel.refreshCount() }
-                    .font(.system(size: 11))
-            }
-
-            Divider()
-
-            Button("清空全部剪贴板历史") {
-                ClipboardStore.shared.clear()
-                viewModel.refreshCount()
-                NotificationCenter.default.post(name: .clipboardHistoryCleared, object: nil)
-            }
-            .foregroundStyle(.red)
-
-            Spacer()
+            .padding(18)
         }
-        .padding(20)
     }
 
     private var imageSizeBinding: Binding<Int> {
@@ -414,75 +620,155 @@ struct SettingsView: View {
         )
     }
 
-    // MARK: - 快捷键
+    // MARK: - 快捷键页签
 
     private var hotkeyTab: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("全局快捷键用于随时呼出剪贴板历史，无需辅助功能权限。")
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                GlassCard(title: "呼出全局面板快捷键", icon: "command", tint: .blue) {
+                    VStack(alignment: .leading, spacing: 14) {
+                        Text("基于 Carbon 全局事件注册，随时随地一键呼出剪贴板历史，无需辅助功能（Accessibility）权限。")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
 
-            HStack(spacing: 12) {
-                Text("当前快捷键").font(.system(size: 12.5))
-                Text(store.settings.hotKey?.display ?? "未设置")
-                    .font(.system(size: 13, weight: .semibold, design: .monospaced))
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 4)
-                    .background(Color.primary.opacity(0.08))
-                    .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
-                Spacer()
-            }
+                        HStack(spacing: 14) {
+                            Text("当前快捷键")
+                                .font(.system(size: 12.5))
 
-            HStack(spacing: 10) {
-                Button(viewModel.recording ? "请按下组合键…（Esc 取消）" : "录制快捷键") {
-                    if viewModel.recording {
-                        viewModel.stopRecording()
-                    } else {
-                        viewModel.startRecording(store: store)
+                            Text(store.settings.hotKey?.display ?? "未设置")
+                                .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 5)
+                                .background(Color.primary.opacity(0.08))
+                                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                        .strokeBorder(Color.white.opacity(0.2), lineWidth: 0.8)
+                                )
+
+                            Spacer()
+                        }
+
+                        HStack(spacing: 10) {
+                            Button {
+                                if viewModel.recording {
+                                    viewModel.stopRecording()
+                                } else {
+                                    viewModel.startRecording(store: store)
+                                }
+                            } label: {
+                                HStack(spacing: 6) {
+                                    if viewModel.recording {
+                                        Circle().fill(Color.red).frame(width: 8, height: 8)
+                                    }
+                                    Text(viewModel.recording ? "请按下组合键…（Esc 取消）" : "录制新快捷键")
+                                }
+                                .font(.system(size: 12, weight: .medium))
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(viewModel.recording ? Color.red.opacity(0.12) : Color.blue.opacity(0.15))
+                                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                        .strokeBorder(viewModel.recording ? Color.red.opacity(0.4) : Color.blue.opacity(0.3), lineWidth: 0.8)
+                                )
+                                .foregroundStyle(viewModel.recording ? Color.red : Color.blue)
+                            }
+                            .buttonStyle(.plain)
+
+                            Button("清除") {
+                                store.set { $0.hotKey = nil }
+                            }
+                            .font(.system(size: 12))
+                            .disabled(store.settings.hotKey == nil)
+                        }
+
+                        Text("要求至少包含一个修饰键（⌘ Command / ⌥ Option / ⌃ Control / ⇧ Shift）。")
+                            .font(.system(size: 10.5))
+                            .foregroundStyle(.secondary)
                     }
                 }
-                Button("清除") {
-                    store.set { $0.hotKey = nil }
-                }
-                .disabled(store.settings.hotKey == nil)
             }
-
-            Text("要求至少包含一个修饰键（⌘ / ⌥ / ⌃ / ⇧）。")
-                .font(.system(size: 10.5))
-                .foregroundStyle(.secondary)
-
-            Spacer()
+            .padding(18)
         }
-        .padding(20)
     }
 
-    // MARK: - 关于
+    // MARK: - 关于页签
 
     private var aboutTab: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 12) {
-                Image(systemName: "doc.on.clipboard")
-                    .font(.system(size: 30))
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("ClipStats").font(.system(size: 16, weight: .semibold))
-                    Text("版本 0.1.0 · arm64 原生").font(.system(size: 11)).foregroundStyle(.secondary)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                GlassCard(title: "ClipStats", icon: "info.circle.fill", tint: .indigo) {
+                    VStack(alignment: .leading, spacing: 14) {
+                        HStack(spacing: 14) {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [Color.blue, Color.purple],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                    .frame(width: 52, height: 52)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                            .strokeBorder(Color.white.opacity(0.35), lineWidth: 1.0)
+                                    )
+                                Image(systemName: "doc.on.clipboard.fill")
+                                    .font(.system(size: 26, weight: .medium))
+                                    .foregroundStyle(.white)
+                            }
+
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("ClipStats")
+                                    .font(.system(size: 18, weight: .bold))
+                                HStack(spacing: 6) {
+                                    Text("版本 0.1.0")
+                                        .font(.system(size: 11))
+                                        .foregroundStyle(.secondary)
+                                    Text("arm64 原生")
+                                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 1.5)
+                                        .background(Color.green.opacity(0.12))
+                                        .clipShape(Capsule())
+                                        .foregroundStyle(Color.green)
+                                }
+                            }
+                        }
+
+                        Divider().opacity(0.3)
+
+                        Text("优雅精巧的 macOS 菜单栏系统指标监控与剪贴板历史管理器。")
+                            .font(.system(size: 12.5))
+
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("底层数据源架构：")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(.secondary)
+
+                            Text("• host_statistics / host_processor_info：CPU 核心与物理内存")
+                                .font(.system(size: 11))
+                                .foregroundStyle(.secondary)
+                            Text("• IOAccelerator：GPU 图形处理器占用")
+                                .font(.system(size: 11))
+                                .foregroundStyle(.secondary)
+                            Text("• sysctl NET_RT_IFLIST2：实时网络上行与下行吞吐")
+                                .font(.system(size: 11))
+                                .foregroundStyle(.secondary)
+                            Text("• AppleSMC：芯片硅片热敏传感器温度矩阵")
+                                .font(.system(size: 11))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                 }
             }
-            Divider()
-            Text("菜单栏系统监控 + 剪贴板历史工具。")
-                .font(.system(size: 12))
-            Text("数据来源：host_statistics / host_processor_info（CPU、内存）、IOAccelerator（GPU）、sysctl NET_RT_IFLIST2（网速）、AppleSMC（温度）。")
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
-            Text("温度读取依赖 SMC 私有接口，不同芯片的键名不同，程序会在启动时自动枚举。若显示 -- 说明当前系统未开放该接口。")
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
-            Spacer()
+            .padding(18)
         }
-        .padding(20)
     }
 
-    // MARK: - 工具
+    // MARK: - 工具方法
 
     private func binding<T>(_ keyPath: WritableKeyPath<AppSettings, T>) -> Binding<T> {
         Binding(
@@ -498,6 +784,51 @@ struct SettingsView: View {
         store.set { settings in
             settings.segments.swapAt(index, target)
         }
+    }
+}
+
+// MARK: - 液态玻璃卡片容器
+
+private struct GlassCard<Content: View>: View {
+    let title: String
+    let icon: String
+    let tint: Color
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(tint.opacity(0.15))
+                        .frame(width: 22, height: 22)
+                    Image(systemName: icon)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(tint)
+                }
+
+                Text(title)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.primary)
+
+                Spacer()
+            }
+
+            content()
+        }
+        .padding(14)
+        .background(
+            ZStack {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Color.primary.opacity(0.035))
+                LiquidGlassStyle.surfaceGloss
+            }
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(LiquidGlassStyle.cardRimStroke, lineWidth: 0.8)
+        )
     }
 }
 

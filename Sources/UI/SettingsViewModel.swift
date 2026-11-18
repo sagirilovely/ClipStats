@@ -21,6 +21,17 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         case .about: return "about"
         }
     }
+
+    var icon: String {
+        switch self {
+        case .statusBar: return "menubar.rectangle"
+        case .appearance: return "paintpalette.fill"
+        case .sampling: return "gauge.with.needle.fill"
+        case .clipboard: return "doc.on.clipboard.fill"
+        case .hotkey: return "command"
+        case .about: return "info.circle.fill"
+        }
+    }
 }
 
 /// 设置界面的临时状态（避免使用 @State —— 它依赖仅 Xcode 分发的宏插件）

@@ -103,7 +103,7 @@ final class ClipboardStore {
         defer { lock.unlock() }
 
         if let existingID = existingID(hash: hash) {
-            var statement = prepare("UPDATE items SET created_at = ? WHERE id = ?")
+            let statement = prepare("UPDATE items SET created_at = ? WHERE id = ?")
             if let statement {
                 sqlite3_bind_double(statement, 1, Date().timeIntervalSince1970)
                 sqlite3_bind_int64(statement, 2, existingID)
@@ -113,7 +113,7 @@ final class ClipboardStore {
             return item(id: existingID)
         }
 
-        var statement = prepare("""
+        let statement = prepare("""
         INSERT INTO items (kind, text, data, thumb, hash, source_app, created_at, pinned)
         VALUES (?, ?, ?, ?, ?, ?, ?, 0)
         """)
@@ -154,7 +154,7 @@ final class ClipboardStore {
     }
 
     private func existingID(hash: String) -> Int64? {
-        var statement = prepare("SELECT id FROM items WHERE hash = ? LIMIT 1")
+        let statement = prepare("SELECT id FROM items WHERE hash = ? LIMIT 1")
         guard let statement else { return nil }
         defer { sqlite3_finalize(statement) }
         sqlite3_bind_text(statement, 1, hash, -1, Self.transient)
@@ -166,26 +166,34 @@ final class ClipboardStore {
 
     // MARK: - 查询
 
-    func items(search: String = "", limit: Int = 500) -> [Item] {
+    func items(search: String = "", kind: Kind? = nil, limit: Int = 500) -> [Item] {
         lock.lock()
         defer { lock.unlock() }
 
-        var sql = "SELECT id, kind, text, thumb, created_at, source_app, pinned FROM items"
-        if !search.trimmingCharacters(in: .whitespaces).isEmpty {
-            sql += " WHERE text LIKE ?"
+        var sql = "SELECT id, kind, text, thumb, created_at, source_app, pinned FROM items WHERE 1=1"
+        let trimmed = search.trimmingCharacters(in: .whitespaces)
+        if !trimmed.isEmpty {
+            sql += " AND text LIKE ?"
+        }
+        if kind != nil {
+            sql += " AND kind = ?"
         }
         sql += " ORDER BY pinned DESC, created_at DESC LIMIT ?"
 
         guard let statement = prepare(sql) else { return [] }
         defer { sqlite3_finalize(statement) }
 
-        if !search.trimmingCharacters(in: .whitespaces).isEmpty {
-            let pattern = "%\(search)%"
-            sqlite3_bind_text(statement, 1, pattern, -1, Self.transient)
-            sqlite3_bind_int(statement, 2, Int32(limit))
-        } else {
-            sqlite3_bind_int(statement, 1, Int32(limit))
+        var bindIndex: Int32 = 1
+        if !trimmed.isEmpty {
+            let pattern = "%\(trimmed)%"
+            sqlite3_bind_text(statement, bindIndex, pattern, -1, Self.transient)
+            bindIndex += 1
         }
+        if let kind {
+            sqlite3_bind_text(statement, bindIndex, kind.rawValue, -1, Self.transient)
+            bindIndex += 1
+        }
+        sqlite3_bind_int(statement, bindIndex, Int32(limit))
 
         var result: [Item] = []
         while sqlite3_step(statement) == SQLITE_ROW {
@@ -295,6 +303,15 @@ final class ClipboardStore {
         lock.lock()
         defer { lock.unlock() }
         guard let statement = prepare("DELETE FROM items WHERE id = ?") else { return }
+        defer { sqlite3_finalize(statement) }
+        sqlite3_bind_int64(statement, 1, id)
+        sqlite3_step(statement)
+    }
+
+    func togglePin(id: Int64) {
+        lock.lock()
+        defer { lock.unlock() }
+        guard let statement = prepare("UPDATE items SET pinned = CASE WHEN pinned = 1 THEN 0 ELSE 1 END WHERE id = ?") else { return }
         defer { sqlite3_finalize(statement) }
         sqlite3_bind_int64(statement, 1, id)
         sqlite3_step(statement)

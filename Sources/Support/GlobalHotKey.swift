@@ -28,13 +28,12 @@ final class GlobalHotKeyManager {
             return noErr
         }, 1, &eventType, selfPtr, &eventHandler)
 
-        var hotKeyID = EventHotKeyID(signature: OSType(0x43534B59), id: 1) // 'CSKY'
+        let hotKeyID = EventHotKeyID(signature: OSType(0x43534B59), id: 1) // 'CSKY'
         let status = RegisterEventHotKey(config.keyCode, config.modifiers, hotKeyID,
                                          GetApplicationEventTarget(), 0, &hotKeyRef)
         if status != noErr {
             NSLog("ClipStats: register hotkey failed: \(status)")
         }
-        _ = hotKeyID
     }
 
     func unregister() {

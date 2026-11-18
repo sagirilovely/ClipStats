@@ -7,22 +7,14 @@ struct ClipboardPanelView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            searchBar
-            Divider()
+            headerSection
+            liquidDivider
             listArea
-            Divider()
-            footer
+            liquidDivider
+            footerSection
         }
-        .frame(width: 380, height: CGFloat(model.panelHeight))
-        .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(Color(nsColor: .windowBackgroundColor))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(Color.primary.opacity(0.12), lineWidth: 1)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .frame(width: 390, height: CGFloat(model.panelHeight))
+        .liquidGlassPanel(cornerRadius: 18)
         .onAppear {
             model.reload()
             searchFocused = true
@@ -32,85 +24,256 @@ struct ClipboardPanelView: View {
         }
     }
 
-    private var searchBar: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "magnifyingglass")
-                .foregroundStyle(.secondary)
-                .font(.system(size: 11))
-            TextField("搜索剪贴板历史", text: $model.searchText)
-                .textFieldStyle(.plain)
-                .font(.system(size: 12.5))
-                .focused($searchFocused)
-            if !model.searchText.isEmpty {
-                Button {
-                    model.searchText = ""
-                } label: {
-                    Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+    // MARK: - 顶部搜索与筛选栏
+
+    private var headerSection: some View {
+        VStack(spacing: 8) {
+            // 搜索框
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(model.searchText.isEmpty ? Color.secondary : Color.accentColor)
+
+                TextField("搜索剪贴板历史...", text: $model.searchText)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 13))
+                    .focused($searchFocused)
+
+                if !model.searchText.isEmpty {
+                    Button {
+                        model.searchText = ""
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .background(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(Color.primary.opacity(0.05))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(Color.white.opacity(0.18), lineWidth: 0.8)
+            )
+
+            // 快捷类型筛选药丸
+            HStack {
+                HStack(spacing: 2) {
+                    ForEach(ClipboardPanelModel.FilterKind.allCases) { filter in
+                        filterPill(filter)
+                    }
+                }
+                .padding(2.5)
+                .background(Color.primary.opacity(0.04))
+                .clipShape(Capsule())
+                .overlay(
+                    Capsule().strokeBorder(Color.white.opacity(0.12), lineWidth: 0.6)
+                )
+
+                Spacer()
             }
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 9)
+        .padding(.top, 12)
+        .padding(.bottom, 9)
     }
+
+    private func filterPill(_ filter: ClipboardPanelModel.FilterKind) -> some View {
+        let isSelected = model.selectedFilter == filter
+        return Button {
+            withAnimation(.easeInOut(duration: 0.15)) {
+                model.selectedFilter = filter
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: filter.icon)
+                    .font(.system(size: 9.5))
+                Text(filter.rawValue)
+                    .font(.system(size: 11, weight: isSelected ? .medium : .regular))
+            }
+            .padding(.horizontal, 9)
+            .padding(.vertical, 3.5)
+            .background(
+                ZStack {
+                    if isSelected {
+                        Capsule()
+                            .fill(Color.primary.opacity(0.12))
+                        LiquidGlassStyle.surfaceGloss
+                    }
+                }
+            )
+            .clipShape(Capsule())
+            .overlay(
+                Capsule()
+                    .strokeBorder(
+                        isSelected ? Color.white.opacity(0.28) : Color.clear,
+                        lineWidth: 0.8
+                    )
+            )
+            .foregroundStyle(isSelected ? Color.primary : Color.secondary)
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - 液态分隔线
+
+    private var liquidDivider: some View {
+        Rectangle()
+            .fill(
+                LinearGradient(
+                    colors: [
+                        Color.white.opacity(0.04),
+                        Color.white.opacity(0.24),
+                        Color.white.opacity(0.04)
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+            )
+            .frame(height: 1)
+    }
+
+    // MARK: - 列表区域
 
     private var listArea: some View {
         Group {
             if model.items.isEmpty {
-                VStack(spacing: 8) {
-                    Image(systemName: "doc.on.clipboard")
-                        .font(.system(size: 26))
-                        .foregroundStyle(.tertiary)
-                    Text(model.searchText.isEmpty ? "暂无剪贴板记录" : "没有匹配的记录")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                emptyState
             } else {
                 ScrollView {
-                    LazyVStack(spacing: 0) {
+                    LazyVStack(spacing: 4) {
                         ForEach(model.items) { item in
                             ClipRow(
                                 item: item,
                                 hovered: model.hoveredID == item.id,
                                 onSelect: { model.restore(item) },
+                                onTogglePin: { model.togglePin(item) },
                                 onDelete: { model.delete(item) },
                                 onHoverChange: { model.setHovered(item.id, $0) }
                             )
-                            Divider().opacity(0.4)
                         }
                     }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 6)
                 }
             }
         }
         .frame(maxHeight: .infinity)
     }
 
-    private var footer: some View {
+    // MARK: - 空状态视觉
+
+    private var emptyState: some View {
+        VStack(spacing: 12) {
+            ZStack {
+                Circle()
+                    .fill(Color.primary.opacity(0.04))
+                    .frame(width: 64, height: 64)
+                    .overlay(
+                        Circle().strokeBorder(Color.white.opacity(0.2), lineWidth: 1)
+                    )
+
+                Image(systemName: "doc.on.clipboard")
+                    .font(.system(size: 26, weight: .light))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [Color.blue.opacity(0.8), Color.purple.opacity(0.7)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            }
+
+            VStack(spacing: 4) {
+                Text(model.searchText.isEmpty ? "暂无剪贴板记录" : "没有匹配的记录")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.primary)
+
+                Text(model.searchText.isEmpty ? "在任意应用复制的内容会自动出现在这里" : "尝试更换搜索关键字")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    // MARK: - 底部液态操作栏
+
+    private var footerSection: some View {
         HStack(spacing: 10) {
+            // 运行状态与指示灯
+            HStack(spacing: 6) {
+                ZStack {
+                    Circle()
+                        .fill(model.paused ? Color.orange : Color.green)
+                        .frame(width: 7, height: 7)
+                    if !model.paused {
+                        Circle()
+                            .stroke(Color.green.opacity(0.5), lineWidth: 1.5)
+                            .frame(width: 11, height: 11)
+                    }
+                }
+
+                Text(model.paused ? "已暂停" : "\(model.totalCount) 条")
+                    .font(.system(size: 11, weight: .medium, design: .monospaced))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(Color.primary.opacity(0.04))
+            .clipShape(Capsule())
+            .overlay(
+                Capsule().strokeBorder(Color.white.opacity(0.12), lineWidth: 0.6)
+            )
+
             Button {
                 model.togglePause()
             } label: {
-                Image(systemName: model.paused ? "play.circle" : "pause.circle")
+                Image(systemName: model.paused ? "play.circle.fill" : "pause.circle")
+                    .font(.system(size: 13))
+                    .foregroundStyle(model.paused ? Color.green : Color.secondary)
             }
             .buttonStyle(.plain)
             .help(model.paused ? "恢复记录" : "暂停记录")
 
-            Text(model.paused ? "已暂停记录" : "\(model.totalCount) 条记录")
-                .font(.system(size: 10.5))
-                .foregroundStyle(.secondary)
-
             Spacer()
 
-            Button("清空") { model.clearAll() }
-                .font(.system(size: 11))
-                .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
+            // 清空按钮
+            Button {
+                model.clearAll()
+            } label: {
+                Text("清空")
+                    .font(.system(size: 11, weight: .regular))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3.5)
+                    .background(Color.primary.opacity(0.03))
+                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .strokeBorder(Color.white.opacity(0.1), lineWidth: 0.6)
+                    )
+            }
+            .buttonStyle(.plain)
 
+            // 设置按钮
             Button {
                 model.openSettings()
             } label: {
-                Image(systemName: "gearshape")
+                Image(systemName: "gearshape.fill")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .padding(5)
+                    .background(Color.primary.opacity(0.04))
+                    .clipShape(Circle())
+                    .overlay(
+                        Circle().strokeBorder(Color.white.opacity(0.15), lineWidth: 0.6)
+                    )
             }
             .buttonStyle(.plain)
             .help("设置")
@@ -120,80 +283,181 @@ struct ClipboardPanelView: View {
     }
 }
 
+// MARK: - 剪贴板条目行 (液态玻璃卡片)
+
 private struct ClipRow: View {
     let item: ClipboardStore.Item
     let hovered: Bool
     let onSelect: () -> Void
+    let onTogglePin: () -> Void
     let onDelete: () -> Void
     let onHoverChange: (Bool) -> Void
 
     var body: some View {
-        HStack(alignment: .top, spacing: 9) {
-            leading
-                .frame(width: 38, height: 38)
-                .background(Color.primary.opacity(0.06))
-                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        HStack(alignment: .center, spacing: 10) {
+            // 图标 / 缩略图徽标
+            leadingBadge
+                .frame(width: 36, height: 36)
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .strokeBorder(Color.white.opacity(0.2), lineWidth: 0.6)
+                )
 
+            // 文本内容与元数据
             VStack(alignment: .leading, spacing: 3) {
                 Text(item.preview.isEmpty ? "（空内容）" : item.preview)
-                    .font(.system(size: 12.5))
+                    .font(.system(size: 12.5, weight: .regular))
                     .lineLimit(2)
+                    .lineSpacing(2)
                     .multilineTextAlignment(.leading)
                     .foregroundStyle(.primary)
+
                 HStack(spacing: 6) {
                     if let app = item.sourceApp, !app.isEmpty {
                         Text(app)
+                            .font(.system(size: 9.5, weight: .medium))
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 1.5)
+                            .background(Color.primary.opacity(0.06))
+                            .clipShape(Capsule())
+                            .overlay(
+                                Capsule().strokeBorder(Color.white.opacity(0.12), lineWidth: 0.5)
+                            )
                     }
-                    Text(Fmt.relativeTime(item.createdAt))
-                }
-                .font(.system(size: 10))
-                .foregroundStyle(.secondary)
-            }
-            Spacer(minLength: 0)
 
-            if hovered {
-                Button {
-                    onDelete()
-                } label: {
-                    Image(systemName: "trash")
-                        .font(.system(size: 10))
+                    Text(Fmt.relativeTime(item.createdAt))
+                        .font(.system(size: 10, design: .monospaced))
                         .foregroundStyle(.secondary)
+
+                    if item.pinned {
+                        HStack(spacing: 2) {
+                            Image(systemName: "pin.fill")
+                                .font(.system(size: 8))
+                            Text("置顶")
+                                .font(.system(size: 9))
+                        }
+                        .foregroundStyle(Color.orange)
+                    }
                 }
-                .buttonStyle(.plain)
-                .help("删除这条记录")
+            }
+
+            Spacer(minLength: 4)
+
+            // 悬停操作按钮组
+            if hovered || item.pinned {
+                HStack(spacing: 4) {
+                    Button {
+                        onTogglePin()
+                    } label: {
+                        Image(systemName: item.pinned ? "pin.fill" : "pin")
+                            .font(.system(size: 10.5))
+                            .foregroundStyle(item.pinned ? Color.orange : Color.secondary)
+                            .padding(5)
+                            .background(Color.primary.opacity(0.06))
+                            .clipShape(Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .help(item.pinned ? "取消置顶" : "置顶")
+
+                    Button {
+                        onDelete()
+                    } label: {
+                        Image(systemName: "trash")
+                            .font(.system(size: 10.5))
+                            .foregroundStyle(Color.secondary)
+                            .padding(5)
+                            .background(Color.primary.opacity(0.06))
+                            .clipShape(Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .help("删除此项")
+                }
+                .transition(.opacity.combined(with: .scale(scale: 0.92)))
             }
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, 10)
         .padding(.vertical, 7)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(hovered ? Color.primary.opacity(0.07) : Color.clear)
+        .background(
+            ZStack {
+                if hovered {
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(Color.primary.opacity(0.065))
+                    LiquidGlassStyle.surfaceGloss
+                } else if item.pinned {
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(Color.orange.opacity(0.04))
+                }
+            }
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(
+            Group {
+                if hovered {
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .strokeBorder(LiquidGlassStyle.cardRimStroke, lineWidth: 0.8)
+                } else if item.pinned {
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .strokeBorder(Color.orange.opacity(0.25), lineWidth: 0.8)
+                }
+            }
+        )
         .contentShape(Rectangle())
         .onHover { onHoverChange($0) }
         .onTapGesture { onSelect() }
+        .animation(.easeOut(duration: 0.16), value: hovered)
     }
 
     @ViewBuilder
-    private var leading: some View {
+    private var leadingBadge: some View {
         switch item.kind {
         case .image:
             if let data = item.thumbData, let image = NSImage(data: data) {
                 Image(nsImage: image)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
-                    .padding(2)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .strokeBorder(Color.white.opacity(0.25), lineWidth: 0.6)
+                    )
             } else {
-                Image(systemName: "photo")
-                    .font(.system(size: 13))
-                    .foregroundStyle(.secondary)
+                ZStack {
+                    LinearGradient(
+                        colors: [Color(hex: 0xBF5AF2), Color(hex: 0xAF52DE)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    LiquidGlassStyle.surfaceGloss
+                    Image(systemName: "photo.fill")
+                        .font(.system(size: 14))
+                        .foregroundStyle(.white)
+                }
             }
         case .files:
-            Image(systemName: "folder")
-                .font(.system(size: 13))
-                .foregroundStyle(.secondary)
+            ZStack {
+                LinearGradient(
+                    colors: [Color(hex: 0xFF9F0A), Color(hex: 0xF38B00)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                LiquidGlassStyle.surfaceGloss
+                Image(systemName: "folder.fill")
+                    .font(.system(size: 14))
+                    .foregroundStyle(.white)
+            }
         case .text:
-            Image(systemName: "text.alignleft")
-                .font(.system(size: 12))
-                .foregroundStyle(.secondary)
+            ZStack {
+                LinearGradient(
+                    colors: [Color(hex: 0x0A84FF), Color(hex: 0x0062D2)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                LiquidGlassStyle.surfaceGloss
+                Image(systemName: "doc.text.fill")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.white)
+            }
         }
     }
 }
