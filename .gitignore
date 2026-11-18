@@ -1,6 +1,7 @@
 # 构建产物
 build/
 .build/
+dist/
 
 # 生成的图标集（由 scripts/make-icon.swift 生成，AppIcon.icns 已提交）
 Resources/AppIcon.iconset/

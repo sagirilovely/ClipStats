@@ -1,1 +1,0 @@
-a1a244b07eb349b3bd99aec11aa1f662a6c8b993dc20943783b8cfba507079cc  ClipStats-0.1.0-macos-universal.zip
