@@ -85,6 +85,7 @@ final class StatusItemView: NSView {
 
     /// 仅用于离屏截图自检
     var debugBackgroundColor: NSColor?
+    var debugHover = false { didSet { contentView.needsDisplay = true } }
 
     weak var statusItem: NSStatusItem?
 
@@ -307,6 +308,12 @@ final class StatusItemView: NSView {
         bounds.insetBy(dx: 1, dy: 2)
     }
 
+    /// 悬停高亮区域：水平内缩不超过内容留白，避免把两端文字切到高亮之外
+    private func hoverRect() -> NSRect {
+        let horizontalInset = min(2, style.padding)
+        return bounds.insetBy(dx: horizontalInset, dy: 3)
+    }
+
     // MARK: - 绘制
 
     override func draw(_ dirtyRect: NSRect) {
@@ -342,13 +349,15 @@ final class StatusItemView: NSView {
     }
 
     private func drawContent() {
-        if isHovered || isPanelOpen {
-            let rect = backgroundRect()
-            let path = NSBezierPath(roundedRect: rect, xRadius: style.cornerRadius, yRadius: style.cornerRadius)
-            let alpha: CGFloat = isPanelOpen ? 0.22 : 0.12
-            NSColor.labelColor.withAlphaComponent(alpha).setFill()
+        if isHovered || isPanelOpen || debugHover {
+            // 悬停高亮用固定的圆角矩形：不复用背景的 cornerRadius，
+            // 否则半径接近高度一半时会退化成椭圆，把两端文字裁掉
+            let rect = hoverRect()
+            let radius = min(6, rect.height / 2)
+            let path = NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius)
+            NSColor.labelColor.withAlphaComponent(isPanelOpen ? 0.20 : 0.11).setFill()
             path.fill()
-            NSColor.white.withAlphaComponent(isPanelOpen ? 0.32 : 0.18).setStroke()
+            NSColor.labelColor.withAlphaComponent(isPanelOpen ? 0.26 : 0.15).setStroke()
             path.lineWidth = 0.8
             path.stroke()
         }
@@ -588,6 +597,10 @@ final class StatusBarController {
     func setDebugBackground(_ color: NSColor?) {
         view.debugBackgroundColor = color
         view.needsDisplay = true
+    }
+
+    func setDebugHover(_ hovering: Bool) {
+        view.debugHover = hovering
     }
 
     var anchorFrame: NSRect {

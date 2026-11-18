@@ -230,6 +230,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                         if let view = self.panelController.panelContentView {
                             self.snapshot(view, to: "/tmp/shot-panel.png")
                         }
+                        self.statusBar.setDebugHover(true)
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                            let appearance = self.statusBar.statusView.effectiveAppearance
+                            let style = appearance.bestMatch(from: [.darkAqua, .aqua])
+                            self.statusBar.setDebugBackground(style == .darkAqua ? .black : .white)
+                            self.snapshot(self.statusBar.statusView, to: "/tmp/shot-bar-hover.png")
+                            self.statusBar.setDebugBackground(nil)
+                            self.statusBar.setDebugHover(false)
+                        }
                         self.snapshot(self.statusBar.statusView, to: "/tmp/shot-bar-transparent.png")
                         let viewAppearance = self.statusBar.statusView.effectiveAppearance
                         let style = viewAppearance.bestMatch(from: [.darkAqua, .aqua])
