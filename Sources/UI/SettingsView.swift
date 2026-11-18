@@ -332,7 +332,7 @@ struct SettingsView: View {
                             }
                             Spacer()
                         }
-                        Text("夜览模式使用深色玻璃材质；面板右上角或底部的主题按钮可快速切换。状态栏自定义颜色保持不变。")
+                        Text("夜览模式使用深色玻璃材质；进程面板右上角的主题按钮可快速切换。状态栏自定义颜色保持不变。")
                             .font(.system(size: 10.5))
                             .foregroundStyle(.secondary)
                     }

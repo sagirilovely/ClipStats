@@ -482,6 +482,15 @@ struct RunningAppsPanelView: View {
             Spacer()
 
             Button {
+                model.onOpenTranslation?()
+            } label: {
+                Image(systemName: "translate")
+            }
+            .buttonStyle(LiquidGlassIconButtonStyle())
+            .help("英汉小翻译")
+            .accessibilityLabel("英汉小翻译")
+
+            Button {
                 model.onSwitchToClipboard?()
             } label: {
                 Image(systemName: "doc.on.clipboard")

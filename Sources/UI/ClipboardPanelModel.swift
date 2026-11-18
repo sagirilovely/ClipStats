@@ -73,6 +73,8 @@ final class ClipboardPanelModel: ObservableObject {
     var onRequestSettings: (() -> Void)?
     /// 由 AppDelegate 注入：切换到「正在运行的应用程序」面板
     var onSwitchToRunningApps: (() -> Void)?
+    /// 由 AppDelegate 注入：打开英汉小翻译面板
+    var onRequestTranslation: (() -> Void)?
     var onRequestQuit: (() -> Void)?
     var onTogglePause: ((Bool) -> Void)?
     /// 清空记录后通知外部（用于刷新状态栏里的历史条数）
@@ -171,6 +173,10 @@ final class ClipboardPanelModel: ObservableObject {
 
     func switchToRunningApps() {
         onSwitchToRunningApps?()
+    }
+
+    func openTranslation() {
+        onRequestTranslation?()
     }
 
     func quit() {

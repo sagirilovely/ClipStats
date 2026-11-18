@@ -10,6 +10,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusBar: StatusBarController!
     private var panelController: ClipboardPanelController!
     private var appsController: RunningAppsPanelController!
+    private var translationController: TranslationPanelController!
     private var settingsWindow: SettingsWindowController?
 
     private var lastApplied: AppSettings?
@@ -23,10 +24,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         panelController = ClipboardPanelController()
         appsController = RunningAppsPanelController()
+        translationController = TranslationPanelController()
 
         // 点剪贴板分段 → 剪贴板历史；点其它任意模块 → 正在运行的应用程序（自动定位并高亮对应分类）
         statusBar.onSegmentClick = { [weak self] kind, anchor in
             guard let self else { return }
+            self.translationController.hide()
             if kind == .clipboard {
                 self.appsController.hide()
                 self.panelController.toggle(anchor: anchor)
@@ -58,12 +61,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         appsController.model.onSwitchToClipboard = { [weak self] in
             guard let self else { return }
             self.appsController.hide()
+            self.translationController.hide()
             self.panelController.show(anchor: self.statusBar.anchorFrame)
+        }
+        appsController.model.onOpenTranslation = { [weak self] in
+            guard let self else { return }
+            self.appsController.hide()
+            self.panelController.hide()
+            self.translationController.show(anchor: self.statusBar.anchorFrame)
         }
         panelController.model.onSwitchToRunningApps = { [weak self] in
             guard let self else { return }
             self.panelController.hide()
             self.appsController.show(anchor: self.statusBar.anchorFrame)
+        }
+        panelController.model.onRequestTranslation = { [weak self] in
+            guard let self else { return }
+            self.panelController.hide()
+            self.translationController.show(anchor: self.statusBar.anchorFrame)
         }
         panelController.onVisibilityChange = { [weak self] visible in
             self?.statusBar.setPanelOpen(visible, for: visible ? .clipboard : nil)
@@ -298,6 +313,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                         }
                     }
                 }
+            } else if show == "translate" {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+                    guard let self else { return }
+                    self.translationController.show(anchor: self.statusBar.anchorFrame)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                        NSLog("%@", "DIAG translate shown visible=\(self.translationController.isVisible)")
+                    }
+                    let text = ProcessInfo.processInfo.environment["CLIPSTATS_DIAG_TRANSLATE_TEXT"] ?? "variableName"
+                    NSLog("%@", "DIAG translate start text=\(text)")
+                    self.translationController.model.english = text
+                    self.translationController.model.edited(.english, text)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 8.0) {
+                        let model = self.translationController.model
+                        NSLog("%@", "DIAG translate result en=[\(model.english)] zh=[\(model.chinese)] status=[\(model.statusText)] direction=[\(model.directionTitle)]")
+                        if let view = self.translationController.panelContentView {
+                            self.snapshot(view, to: "/tmp/shot-translate.png")
+                        }
+
+                    }
+                }
             } else if show == "settings" {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
                     guard let self else { return }
@@ -427,6 +462,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if previous == nil || previous?.interfaceAppearance != settings.interfaceAppearance {
             panelController.applyAppearance(settings.interfaceAppearance)
             appsController.applyAppearance(settings.interfaceAppearance)
+            translationController.applyAppearance(settings.interfaceAppearance)
             settingsWindow?.applyAppearance(settings.interfaceAppearance)
         }
 

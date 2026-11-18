@@ -6,7 +6,7 @@
 
 # 🚀 ClipStats
 
-**极致轻量、原汁原味的 macOS 菜单栏系统监控与原生剪贴板管家**  
+**极致轻量、原汁原味的 macOS 菜单栏系统监控、原生剪贴板管家与随身英汉小翻译**  
 *The Ultra-Lightweight, Native macOS Menu Bar System Monitor & Privacy-First Clipboard Manager.*
 
 [![macOS](https://img.shields.io/badge/macOS-13.0%2B-black?style=flat-square&logo=apple)](https://www.apple.com/macos/)
@@ -40,10 +40,11 @@
 1. **菜单栏过于臃肿**：既要开启系统监控（如 Stats / iStat Menus），又要运行剪贴板工具（如 Maccy / Paste），再加上其他常驻图标，菜单栏空间捉襟见肘，在 MacBook 的刘海屏下甚至被强制遮挡。
 2. **后台开销与权限侵入**：很多工具动辄占用数百 MB 内存，且必须索取危险的**系统辅助功能（Accessibility）**权限，存在潜在的按键记录与隐私泄露风险。
 
-**ClipStats 的诞生，就是为了提供终极的「二合一」原生体验：**
-- **合二为一，极致精巧**：将「系统性能监控」与「剪贴板历史」深度凝结在一枚精炼的菜单栏分段中，状态栏宽度压榨至仅 **269pt**。
+**ClipStats 的诞生，就是为了提供终极的「三合一」原生体验：**
+- **合三为一，极致精巧**：将「系统性能监控」「剪贴板历史」与「英汉小翻译」深度凝结在一枚精炼的菜单栏分段中，状态栏宽度压榨至仅 **269pt**。
 - **苹果液态玻璃（Liquid Glass）视觉**：全面引入 macOS 原生半透明玻璃层级、环境辉光光泽、边缘镜面高光反射与自适应深浅色，美感直达 Apple 官方原生标准。
 - **独立分段悬停与进程分类面板**：鼠标悬停在 CPU / GPU / 内存 / 网络上独立亮起高光，点击即可直达对应的分类运行进程列表并支持一键终止高耗能进程。
+- **自带离线英汉小翻译**：剪贴板与进程面板底栏各有一枚 `A文` 按钮，随手点开就能「填一侧、翻另一侧」，写变量名时不必再切到浏览器或翻译 App，推理全程在本机完成。
 - **零辅助功能权限 & 极致私密**：依托底层 Carbon 全局热键与系统 pasteboard changeCount 监听，无需任何辅助功能权限；剪贴板数据采用 SQLite3 WAL 模式本地密存，绝不联网。
 - **极速构建与超低占用**：纯原生 Swift 编写，**无需安装数十 GB 的 Xcode**，命令行几秒即可编译完成。常驻内存 **< 25MB**，CPU 负载长期维持在 **0.5% 以下**。
 
@@ -53,14 +54,15 @@
 
 | 对比维度 | **ClipStats (本项目)** | **Stats** | **Maccy** | **iStat Menus** | **Paste** |
 | :--- | :---: | :---: | :---: | :---: | :---: |
-| **产品定位** | **监控 + 剪贴板 二合一** | 仅系统监控 | 仅剪贴板历史 | 仅系统监控 | 仅剪贴板历史 |
+| **产品定位** | **监控 + 剪贴板 + 小翻译 三合一** | 仅系统监控 | 仅剪贴板历史 | 仅系统监控 | 仅剪贴板历史 |
 | **设计风格** | **Apple 液态玻璃 (Liquid Glass)** | 简约扁平 | 原生菜单项 | 传统拟物 | 底部卡片浮窗 |
-| **刘海屏优化** | **极度紧凑 (支持负间距调节)** | 较占空间 | 不显示监控 | 较占空间 | 不显示监控 |
+| **刘海屏优化** | **极度紧凑 (间距 / 内边距 0–20pt 微调)** | 较占空间 | 不显示监控 | 较占空间 | 不显示监控 |
 | **辅助功能权限 (AX)** | **❌ 零权限要求 (更安全)** | ❌ 不需要 | ⚠️ 需要辅助功能 | ⚠️ 需要辅助功能 | ⚠️ 需要辅助功能 |
 | **常驻内存开销** | **约 18–25 MB** | 约 60–120 MB | 约 30–50 MB | 约 100–250 MB | 约 80–180 MB |
 | **Apple Silicon SMC 温度** | **✅ 运行时动态自适应枚举** | ✅ 支持 | — | ✅ 支持 | — |
 | **运行进程列表与管理** | **✅ 实时 CPU/GPU/内存/网络排序 + 释放** | ✅ 支持 | — | ✅ 支持 | — |
 | **网速垂直双行布局** | **✅ 支持 (节约 50% 宽度)** | ✅ 支持 | — | ✅ 支持 | — |
+| **内置英汉速查翻译** | **✅ 系统离线翻译 (macOS 15+)** | — | — | — | — |
 | **免 Xcode 快速构建** | **✅ 纯命令行 (Makefile + swiftc)** | ⚠️ 依赖 Xcode | ⚠️ 依赖 Xcode | ❌ 闭源商业软件 | ❌ 闭源商业软件 |
 | **开源免费与隐私** | **✅ 100% MIT 开源，零联网** | ✅ MIT 开源 | ✅ MIT 开源 | ❌ 付费订阅 | ❌ 付费订阅 |
 
@@ -103,7 +105,14 @@
 ### 4. 🎨 液态玻璃美学设置系统
 - **六大专属配置选项卡**：状态栏模块、外观调节、刷新频率、剪贴板管理、全局快捷键与关于说明。
 - **液态玻璃主题切换**：支持「跟随系统 / 浅色 / 夜览」，面板配备半透明玻璃质感与镜面反射高光。
-- **毫米级外观微调**：字体大小（9–16pt）、图标大小、左右边距、模块间距（支持负值紧凑排列）、数值对齐（居中 / 靠右）。
+- **毫米级外观微调**：字体大小（9–16pt）、图标大小、左右内边距与模块间距（均为 0–20pt，负值会让相邻模块互相压字，已不再允许）、数值对齐（居中 / 靠右）。
+
+### 5. 🔤 随身英汉小翻译 (Mini Translator)
+- **随处可唤，不打断心流**：剪贴板面板与进程面板底栏各有一枚 `A文` 按钮，点开即是一枚 344pt 的迷你浮窗，鼠标始终不必离开菜单栏。
+- **双向即时互译**：左右两个输入框，**填哪一侧就自动翻译另一侧**（停顿 0.35 秒触发）；含汉字自动判为「中 → 英」，否则「英 → 中」，顶部胶囊实时显示当前方向。
+- **为变量名而生**：`userName` → 用户名、主要按钮 → `Main button`，译文可直接 ⌘C 带走，省去在浏览器标签页之间来回切换的心智负担。
+- **系统原生离线推理**：调用 macOS 15 起的 Apple `Translation` 框架（`TranslationSession` + SwiftUI `.translationTask`），语言模型在本机运行，**零 API Key、零第三方服务、零网络请求**。
+- **失败可见，而不是无声转圈**：语言包未安装时直接给出「去设置 / 重试」，6 秒无响应即报超时；浮窗不进 Dock、不抢焦点，`ESC` 或 `✕` 即刻收起。
 
 ---
 
@@ -136,12 +145,21 @@
 
 ---
 
+### 英汉小翻译
+
+| 两个面板底栏的 `A文` 入口 | 双向即时互译（填一侧，另一侧自动出） |
+| :---: | :---: |
+| <img src="docs/screenshots/translate-entry.png" alt="翻译入口" width="380" /> | <img src="docs/screenshots/translate-panel.png" alt="翻译面板" width="380" /> |
+| <sub>剪贴板面板与进程面板底栏均可一键呼出，主题切换仍在进程面板右上角与设置里</sub> | <sub>自动识别中英方向，<code>userName</code> → 用户名、主要按钮 → <code>Main button</code></sub> |
+
+---
+
 ### 液态玻璃配置系统
 
 | 外观与紧凑间距定制 | 状态栏模块拖拽排序 |
 | :---: | :---: |
 | <img src="docs/screenshots/settings-appearance.png" alt="外观设置" width="420" /> | <img src="docs/screenshots/settings-statusbar.png" alt="状态栏设置" width="420" /> |
-| <sub>支持模块间距与左右内边距负值微调，彻底消除刘海屏拥挤</sub> | <sub>六大指标自由启闭，支持图标/文本/隐藏前缀切换</sub> |
+| <sub>模块间距与左右内边距 0–20pt 微调，彻底消除刘海屏拥挤</sub> | <sub>六大指标自由启闭，支持图标/文本/隐藏前缀切换</sub> |
 
 | 剪贴板历史容量与隐私选项 | 快速键个性化绑定 |
 | :---: | :---: |
@@ -209,6 +227,7 @@ flowchart TD
         SysctlNet["BSD sysctl (NET_RT_IFLIST2)"]
         NSPaste["NSPasteboard 系统服务"]
         CarbonKey["Carbon EventHotKey 系统接口"]
+        TranslateKit["Translation 框架 (macOS 15+)"]
     end
 
     subgraph Engine["后台动力引擎 (Utility / Background QoS)"]
@@ -231,6 +250,7 @@ flowchart TD
         AppsPanel["RunningAppsPanelView\n(四模态 Top 5 进程列表 + 一键终止)"]
         ClipPanel["ClipboardPanelView\n(SwiftUI 剪贴板历史卡片面板)"]
         SettingsWin["SettingsWindowController\n(液态玻璃与多选项卡配置窗口)"]
+        TranslatePanel["TranslationPanelView\n(英汉互译迷你浮窗)"]
     end
 
     MachHost --> CPUReader & MemReader
@@ -250,6 +270,9 @@ flowchart TD
     StatusItem -.->|分段点击| AppsPanel
     CarbonKey -.->|⌥⌘V 呼出| ClipPanel
     StatusItem -.->|点击表盘徽章| ClipPanel
+    TranslateKit -->|本机离线推理| TranslatePanel
+    ClipPanel -.->|A文 按钮| TranslatePanel
+    AppsPanel -.->|A文 按钮| TranslatePanel
     SettingsWin -.->|动态偏好应用| StatusItem & MetricsEng
 ```
 
@@ -268,6 +291,18 @@ flowchart TD
 
 ---
 
+### 英汉小翻译的实现要点
+
+| 环节 | 做法 | 设计考量 |
+| :--- | :--- | :--- |
+| **方向判定** | 扫描 Unicode 区间（`0x4E00–0x9FFF` 等汉字与假名） | 命中即「中 → 英」，否则「英 → 中」；变量名场景默认英文，无需手动切方向。 |
+| **翻译调用** | `TranslationSession.Configuration` + SwiftUI `.translationTask` | 配置变更时回调 session，先 `prepareTranslation()` 处理语言包，再 `translate(_:)` 取译文，模型全程在本机推理。 |
+| **宿主视图** | 1×1 的 `TranslationTaskHost` 塞进面板背景 | `.translationTask` 要求视图真实挂在窗口里，纯后台对象收不到回调；用 1pt 透明视图既满足要求又不影响布局。 |
+| **失败兜底** | 语言包状态预检 + 6 秒看门狗 | 系统在语言包缺失时会静默挂起回调，看门狗把「永远转圈」变成可行动提示（去设置 / 重试）。 |
+| **依赖边界** | 仅 Apple `Translation` 框架 | 零 API Key、零第三方 SDK、零网络请求；macOS 13 / 14 上面板会提示需要更高系统版本，其余功能不受影响。 |
+
+---
+
 ### 剪贴板安全与隐私保障
 
 1. **WAL 模式 SQLite3 原生存储**
@@ -276,7 +311,7 @@ flowchart TD
 2. **SHA-256 去重与存储优化**
    - 采用 Apple `CryptoKit` 对文本和图片进行 SHA-256 哈希计算，仅记录唯一快照，重复复制自动提权置顶。
 3. **100% 本地数据，零云端泄露**
-   - 数据库存储在本地沙盒目录 `~/Library/Application Support/ClipStats/clipboard.db`，项目无任何网络请求代码，支持离线绝对隔离。
+   - 数据库存储在本地沙盒目录 `~/Library/Application Support/ClipStats/clipboard.db`，项目无任何网络请求代码，支持离线绝对隔离；英汉翻译同样只调用系统框架在本机推理。
 4. **零辅助功能权限热键**
    - 依托 Carbon 底层 `RegisterEventHotKey` 机制，不需要用户授予 Accessibility 权限，避免恶意代码监听击键。
 
@@ -301,6 +336,9 @@ CLIPSTATS_DATA_DIR=/tmp/clipstats-dev ./build/ClipStats.app/Contents/MacOS/ClipS
 
 # 5. 走真实 hover 链路验证悬停预览（image / text / files）
 CLIPSTATS_DIAG=1 CLIPSTATS_DIAG_SHOW=preview CLIPSTATS_DIAG_PREVIEW_KIND=image ./build/ClipStats.app/Contents/MacOS/ClipStats
+
+# 6. 打开英汉小翻译并跑一次真实翻译（结果与截图写入日志与 /tmp/shot-translate.png）
+CLIPSTATS_DIAG=1 CLIPSTATS_DIAG_SHOW=translate CLIPSTATS_DIAG_TRANSLATE_TEXT=userName ./build/ClipStats.app/Contents/MacOS/ClipStats
 ```
 
 ---
@@ -310,7 +348,7 @@ CLIPSTATS_DIAG=1 CLIPSTATS_DIAG_SHOW=preview CLIPSTATS_DIAG_PREVIEW_KIND=image .
 <details>
 <summary><b>Q1: ClipStats 与 Stats、iStat Menus 或 Maccy 相比有何核心优势？</b></summary>
 <p>
-大多数用户以前必须同时运行一个系统监控软件（如 Stats）和一个剪贴板管理工具（如 Maccy）。不仅各占几十到上百兆内存，还在 MacBook 刘海屏下把菜单栏挤满。ClipStats 独创「二合一」设计，在仅 260~270pt 的极窄宽度内优雅融合了这两大功能，采用 Apple 液态玻璃拟物美学，内存占用不到 25MB，且完全不需要辅助功能权限。
+大多数用户以前必须同时运行一个系统监控软件（如 Stats）和一个剪贴板管理工具（如 Maccy）。不仅各占几十到上百兆内存，还在 MacBook 刘海屏下把菜单栏挤满。ClipStats 独创「三合一」设计，在仅 260~270pt 的极窄宽度内优雅融合了这三项能力，采用 Apple 液态玻璃拟物美学，内存占用不到 25MB，且完全不需要辅助功能权限。
 </p>
 </details>
 
@@ -335,12 +373,20 @@ CLIPSTATS_DIAG=1 CLIPSTATS_DIAG_SHOW=preview CLIPSTATS_DIAG_PREVIEW_KIND=image .
 </p>
 </details>
 
+<details>
+<summary><b>Q5: 英汉小翻译需要联网或付费吗？为什么第一次用时没有反应？</b></summary>
+<p>
+完全不需要联网，也没有任何 API Key 或额度限制——它调用的是 macOS 15 起系统自带的 Translation 框架，语言模型在本机推理。首次使用前需要在「系统设置 › 通用 › 语言与地区 › 翻译语言」里下载一次英汉语言包（约 150MB），下载完成后即可一直离线翻译。若语言包尚未下载，面板会直接提示「系统还没下载英汉语言包」并给出「去设置 / 重试」，6 秒无响应也会报告超时，绝不会让您对着一个转圈的输入框发呆。macOS 13 / 14 上该功能会提示需要更高系统版本，其余功能不受影响。
+</p>
+</details>
+
 ---
 
 ## <a id="license"></a>📄 开源协议与鸣谢
 
 - 本项目采用 **[MIT License](LICENSE)** 开源协议，欢迎自由下载、分发、二次开发或集成至个人与商业项目中。
 - 底层硬件指标采集接口设计受到优秀开源项目 [Stats](https://github.com/exelban/stats)（MIT 许可，Copyright © 2019 Serhiy Mytrovtsiy）的启发，详细声明请参阅 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+- 英汉小翻译的调用方式是参考 [Easydict](https://github.com/tisfeng/Easydict)（GPL-3.0）公开的「使用系统 Translation 框架」思路后自行实现的，**未使用其任何源代码**；本项目仍以 MIT 协议独立发布。
 
 ---
 

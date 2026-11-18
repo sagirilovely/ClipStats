@@ -6,7 +6,7 @@
 
 # 🚀 ClipStats
 
-**The Ultra-Lightweight, Native macOS Menu Bar System Monitor & Privacy-First Clipboard Manager**  
+**The Ultra-Lightweight, Native macOS Menu Bar System Monitor, Privacy-First Clipboard Manager & Offline Mini Translator**  
 *Apple Liquid Glass Design · Zero Accessibility Permissions · No-Xcode Build · Apple Silicon Native*
 
 [![macOS](https://img.shields.io/badge/macOS-13.0%2B-black?style=flat-square&logo=apple)](https://www.apple.com/macos/)
@@ -40,10 +40,11 @@ Mac power users and developers often struggle with two notorious menu bar issues
 1. **Menu Bar Crowding & Notch Clutter**: Running separate system monitors (like Stats or iStat Menus) and clipboard history tools (like Maccy or Paste) quickly eats up horizontal screen space. On modern MacBooks with camera notches, icons are frequently hidden or pushed offscreen.
 2. **Resource Overhead & Privacy Risks**: Many popular utility apps consume 100MB–300MB of RAM and insist on requesting intrusive **macOS Accessibility (AX)** permissions, introducing keystroke logging risks.
 
-**ClipStats was created to deliver the ultimate native 2-in-1 desktop companion:**
-- **Compact 2-in-1 Integration**: Merges comprehensive real-time system monitoring with a robust clipboard history manager into a unified menu bar item compressed down to just **269pt**.
+**ClipStats was created to deliver the ultimate native 3-in-1 desktop companion:**
+- **Compact 3-in-1 Integration**: Merges comprehensive real-time system monitoring, a robust clipboard history manager, and an on-device EN ↔ ZH mini translator into a unified menu bar item compressed down to just **269pt**.
 - **Apple Liquid Glass Aesthetic**: Embraces native macOS vibrancy, specular rim reflections, ambient environmental glow, and seamless dark/light mode switching.
 - **Interactive Segments & Running Apps Inspector**: Hovering over any metric lights up an isolated subtle glow; clicking on CPU, GPU, Memory, or Network pops up an instant top-process inspector with one-click termination.
+- **Built-in Offline EN ↔ ZH Translator**: A tiny `A文` button in both panel footers opens a 344pt popover where typing on one side instantly fills the other — no browser tab, no translation app, and inference never leaves your Mac.
 - **Zero Accessibility Permissions Required**: Leverages low-level Carbon Global HotKey APIs (`⌥⌘V`) and system pasteboard changeCount tracking. Zero invasive permissions needed.
 - **Privacy-First Local Storage**: Powered by embedded SQLite3 with Write-Ahead Logging (WAL) and SHA-256 deduplication. 100% offline with zero cloud telemetry.
 - **Xcode-Free Ultra-Fast Build**: Crafted in pure native Swift with no bulky SPM/CocoaPods dependencies. Compiles in seconds using standard macOS Command Line Tools. Typical resident memory is **< 25MB** with **< 0.5% CPU overhead**.
@@ -54,14 +55,15 @@ Mac power users and developers often struggle with two notorious menu bar issues
 
 | Feature / Metric | **ClipStats (This Project)** | **Stats** | **Maccy** | **iStat Menus** | **Paste** |
 | :--- | :---: | :---: | :---: | :---: | :---: |
-| **Product Purpose** | **2-in-1 (Monitor + Clipboard)** | System Monitor Only | Clipboard Only | System Monitor Only | Clipboard Only |
+| **Product Purpose** | **3-in-1 (Monitor + Clipboard + Translator)** | System Monitor Only | Clipboard Only | System Monitor Only | Clipboard Only |
 | **Design Language** | **Apple Liquid Glass** | Minimal Flat | Native Menu Items | Classic Skeuomorphic | Floating Card Drawer |
-| **Notch-Friendly Compactness** | **Ultra-Compact (Negative Spacing)** | Moderate Width | N/A | Wide Footprint | N/A |
+| **Notch-Friendly Compactness** | **Ultra-Compact (0–20pt Spacing & Padding)** | Moderate Width | N/A | Wide Footprint | N/A |
 | **Accessibility Permission (AX)** | **❌ Zero Permissions Needed** | ❌ None | ⚠️ Required | ⚠️ Required | ⚠️ Required |
 | **Resident Memory (RAM)** | **~18–25 MB** | ~60–120 MB | ~30–50 MB | ~100–250 MB | ~80–180 MB |
 | **Apple Silicon SMC Thermals** | **✅ Dynamic Runtime Key Probing** | ✅ Supported | — | ✅ Supported | — |
 | **Process Inspector & Killing** | **✅ Live CPU/GPU/RAM/Net ranking + release** | ✅ Supported | — | ✅ Supported | — |
 | **Vertical Dual-Row Net Speed** | **✅ Supported (50% Space Saved)** | ✅ Supported | — | ✅ Supported | — |
+| **Built-in EN ↔ ZH Translator** | **✅ On-device system translation (macOS 15+)** | — | — | — | — |
 | **Xcode-Free CLI Build** | **✅ Instant (Makefile + swiftc)** | ⚠️ Requires Xcode | ⚠️ Requires Xcode | ❌ Proprietary | ❌ Proprietary |
 | **Open Source & Free** | **✅ 100% MIT, Zero Telemetry** | ✅ MIT License | ✅ MIT License | ❌ Paid Subscription | ❌ Paid Subscription |
 
@@ -104,7 +106,14 @@ Mac power users and developers often struggle with two notorious menu bar issues
 ### 4. 🎨 Liquid Glass Preferences System
 - **6 Focused Preference Tabs**: Status Bar Modules, Appearance, Update Intervals, Clipboard Capacity, Global Hotkeys, and About.
 - **Adaptive Appearance**: Instant switching between `Follow System`, `Light`, and `Night (Dark Glass)`.
-- **Pixel-Level Micro Tuning**: Fine-tune font sizes (9–16pt), icon dimensions, horizontal padding, module spacing (including negative values), and numeric alignment (Center / Right).
+- **Pixel-Level Micro Tuning**: Fine-tune font sizes (9–16pt), icon dimensions, horizontal padding and module spacing (both **0–20pt** — negative values overlap neighbouring segments, so they are no longer accepted), and numeric alignment (Center / Right).
+
+### 5. 🔤 Pocket EN ↔ ZH Mini Translator
+- **One click away, no context switch**: An `A文` button sits in the footer of both the clipboard panel and the process inspector; clicking it opens a 344pt popover without ever leaving the menu bar.
+- **Bidirectional instant translation**: Two fields — **whichever side you type into, the other side fills itself** after a 0.35 s pause. Text containing CJK ideographs goes 中 → 英, everything else 英 → 中, and the header pill shows the active direction.
+- **Made for naming variables**: `userName` → 用户名, 主要按钮 → `Main button`; results are plain selectable text, so ⌘C is enough.
+- **On-device only**: Uses Apple's `Translation` framework (macOS 15+) via `TranslationSession` and SwiftUI `.translationTask`. Models run locally — **no API key, no third-party service, no network request**.
+- **Fails loudly, never spins forever**: A missing language pack surfaces "去设置 / 重试" actions, and a 6-second watchdog turns a silent stall into an actionable timeout. The popover never takes Dock space or steals focus; `ESC` or `✕` closes it.
 
 ---
 
@@ -137,12 +146,21 @@ Mac power users and developers often struggle with two notorious menu bar issues
 
 ---
 
+### Pocket Mini Translator
+
+| `A文` entry in both panel footers | Bidirectional live translation (type one side, the other fills) |
+| :---: | :---: |
+| <img src="docs/screenshots/translate-entry.png" alt="Translator Entry Points" width="380" /> | <img src="docs/screenshots/translate-panel.png" alt="Translator Popover" width="380" /> |
+| <sub>Available from the clipboard panel and the process inspector; theme toggle still lives in the inspector header and Settings</sub> | <sub>Direction is detected automatically — <code>userName</code> → 用户名, 主要按钮 → <code>Main button</code></sub> |
+
+---
+
 ### Liquid Glass Preferences
 
 | Appearance & Notch Spacing Sliders | Status Bar Module Reordering |
 | :---: | :---: |
 | <img src="docs/screenshots/settings-appearance.png" alt="Appearance Settings" width="420" /> | <img src="docs/screenshots/settings-statusbar.png" alt="Status Bar Settings" width="420" /> |
-| <sub>Negative spacing controls to eliminate notch clutter</sub> | <sub>Toggle and reorder 6 modules with icon/text prefix options</sub> |
+| <sub>Spacing and padding sliders (0–20pt) to keep the bar compact under the notch</sub> | <sub>Toggle and reorder 6 modules with icon/text prefix options</sub> |
 
 | Clipboard History Limits & Privacy Filters | Customizable Global Hotkeys |
 | :---: | :---: |
@@ -210,6 +228,7 @@ flowchart TD
         SysctlNet["BSD sysctl (NET_RT_IFLIST2)"]
         NSPaste["NSPasteboard Service"]
         CarbonKey["Carbon EventHotKey API"]
+        TranslateKit["Translation Framework (macOS 15+)"]
     end
 
     subgraph Engine["Background Metric Engine (Utility QoS)"]
@@ -232,6 +251,7 @@ flowchart TD
         AppsPanel["RunningAppsPanelView\n(4-Mode Top 5 Process List + Process Kill)"]
         ClipPanel["ClipboardPanelView\n(SwiftUI Responsive Card Panel)"]
         SettingsWin["SettingsWindowController\n(Liquid Glass Preferences Window)"]
+        TranslatePanel["TranslationPanelView\n(EN ↔ ZH Mini Popover)"]
     end
 
     MachHost --> CPUReader & MemReader
@@ -251,6 +271,9 @@ flowchart TD
     StatusItem -.->|Click Segment| AppsPanel
     CarbonKey -.->|Trigger ⌥⌘V| ClipPanel
     StatusItem -.->|Click Badge| ClipPanel
+    TranslateKit -->|On-device Inference| TranslatePanel
+    ClipPanel -.->|A文 Button| TranslatePanel
+    AppsPanel -.->|A文 Button| TranslatePanel
     SettingsWin -.->|Apply Configuration| StatusItem & MetricsEng
 ```
 
@@ -269,6 +292,18 @@ flowchart TD
 
 ---
 
+### How the Mini Translator Works
+
+| Stage | Approach | Engineering Consideration |
+| :--- | :--- | :--- |
+| **Direction detection** | Scans Unicode ranges (`0x4E00–0x9FFF` etc. for CJK ideographs and kana) | CJK input becomes 中 → 英, everything else 英 → 中; the variable-naming use case defaults to English without manual flipping. |
+| **Translation call** | `TranslationSession.Configuration` + SwiftUI `.translationTask` | The task fires whenever the configuration changes; `prepareTranslation()` handles the language pack, then `translate(_:)` produces the text. Inference stays on-device. |
+| **Host view** | A 1×1 `TranslationTaskHost` embedded in the popover background | `.translationTask` only fires for views genuinely attached to a window, so a bare background object is not enough; the 1pt view satisfies that without affecting layout. |
+| **Failure handling** | Language-pack pre-check + 6-second watchdog | macOS silently withholds the callback when a pack is missing, so the watchdog converts an endless spinner into actionable "去设置 / 重试" actions and an explicit timeout. |
+| **Dependency boundary** | Apple's `Translation` framework only | No API key, no third-party SDK, no network request. On macOS 13 / 14 the popover reports that a newer system is required; every other feature is unaffected. |
+
+---
+
 ### Privacy & Clipboard Security
 
 1. **WAL-Mode SQLite3 Native Engine**
@@ -277,7 +312,7 @@ flowchart TD
 2. **SHA-256 Content Deduplication**
    - Computes SHA-256 digests via Apple's `CryptoKit` to index only unique records.
 3. **100% Offline Local Storage**
-   - Stored strictly in `~/Library/Application Support/ClipStats/clipboard.db`. Zero network requests, zero telemetry, zero analytics.
+   - Stored strictly in `~/Library/Application Support/ClipStats/clipboard.db`. Zero network requests, zero telemetry, zero analytics; the EN ↔ ZH translator likewise runs entirely on the system framework, locally.
 4. **Zero Accessibility Permissions Required**
    - Utilizes macOS Carbon `RegisterEventHotKey` for instantaneous invocation without opening sensitive Accessibility key-logging permissions.
 
@@ -302,6 +337,9 @@ CLIPSTATS_DATA_DIR=/tmp/clipstats-dev ./build/ClipStats.app/Contents/MacOS/ClipS
 
 # 5. Exercise the real hover-preview pipeline (image / text / files)
 CLIPSTATS_DIAG=1 CLIPSTATS_DIAG_SHOW=preview CLIPSTATS_DIAG_PREVIEW_KIND=image ./build/ClipStats.app/Contents/MacOS/ClipStats
+
+# 6. Open the translator and run one real translation (log + /tmp/shot-translate.png)
+CLIPSTATS_DIAG=1 CLIPSTATS_DIAG_SHOW=translate CLIPSTATS_DIAG_TRANSLATE_TEXT=userName ./build/ClipStats.app/Contents/MacOS/ClipStats
 ```
 
 ---
@@ -311,7 +349,7 @@ CLIPSTATS_DIAG=1 CLIPSTATS_DIAG_SHOW=preview CLIPSTATS_DIAG_PREVIEW_KIND=image .
 <details>
 <summary><b>Q1: How does ClipStats compare to running Stats alongside Maccy?</b></summary>
 <p>
-Previously, users had to run separate apps for system monitoring and clipboard history, wasting 150MB+ of memory and crowding the menu bar (often getting hidden under MacBook camera notches). ClipStats unifies both utilities in a single 269pt menu bar slot with Apple Liquid Glass styling, uses less than 25MB RAM, and requires no Accessibility permissions.
+Previously, users had to run separate apps for system monitoring and clipboard history, wasting 150MB+ of memory and crowding the menu bar (often getting hidden under MacBook camera notches). ClipStats unifies all three capabilities in a single 269pt menu bar slot with Apple Liquid Glass styling, uses less than 25MB RAM, and requires no Accessibility permissions.
 </p>
 </details>
 
@@ -336,12 +374,20 @@ Absolutely! You only need the macOS Command Line Tools (installable via <code>xc
 </p>
 </details>
 
+<details>
+<summary><b>Q5: Does the mini translator need a network connection or a paid API?</b></summary>
+<p>
+Neither. It uses Apple's built-in <code>Translation</code> framework (macOS 15+) and runs the language model locally — no API key, no quota, no telemetry. Before first use you need to download the EN ↔ ZH language pack once from <b>System Settings › General › Language &amp; Region › Translation Languages</b> (roughly 150MB); after that translation stays fully offline. If the pack is missing the popover says so and offers "去设置 / 重试", and a 6-second watchdog reports a timeout instead of spinning forever. On macOS 13 / 14 the popover explains that a newer system is required, and the rest of the app is unaffected.
+</p>
+</details>
+
 ---
 
 ## <a id="license"></a>📄 License & Acknowledgements
 
 - Licensed under the **[MIT License](LICENSE)**. Free for personal and commercial use, modification, and distribution.
 - Metric collection inspired by [Stats](https://github.com/exelban/stats) (MIT License, Copyright © 2019 Serhiy Mytrovtsiy). See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for full attribution.
+- The mini translator follows the publicly documented approach of using Apple's `Translation` framework, an idea also used by [Easydict](https://github.com/tisfeng/Easydict) (GPL-3.0). **No Easydict source code is used**; ClipStats remains an independent MIT-licensed project.
 
 ---
 

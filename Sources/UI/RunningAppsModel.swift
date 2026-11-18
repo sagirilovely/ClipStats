@@ -78,6 +78,8 @@ final class RunningAppsModel: ObservableObject {
     /// 由 AppDelegate 注入
     var onOpenSettings: (() -> Void)?
     var onSwitchToClipboard: (() -> Void)?
+    /// 由 AppDelegate 注入：打开英汉小翻译面板
+    var onOpenTranslation: (() -> Void)?
     var onModeChange: ((MetricMode) -> Void)?
 
     private let sampler = ProcessSampler()

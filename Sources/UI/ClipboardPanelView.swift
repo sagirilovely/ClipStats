@@ -247,7 +247,15 @@ struct ClipboardPanelView: View {
             }
             .buttonStyle(LiquidGlassButtonStyle())
 
-            AppearanceModeButton(store: store)
+            // 主题切换仍可在进程面板与设置里用，这里换成更常用的翻译入口
+            Button {
+                model.openTranslation()
+            } label: {
+                Image(systemName: "translate")
+            }
+            .buttonStyle(LiquidGlassIconButtonStyle())
+            .help("英汉小翻译")
+            .accessibilityLabel("英汉小翻译")
 
             // 切换到进程列表
             Button {
