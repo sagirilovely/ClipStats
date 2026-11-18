@@ -147,6 +147,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     settings.appearance.segmentSpacing = 2
                     settings.appearance.horizontalPadding = 2
                     settings.appearance.iconPointSize = 10
+                case "gap0":
+                    settings.appearance.segmentSpacing = 0
+                    settings.appearance.horizontalPadding = 0
+                    settings.stabilizeBarWidth = true
+                    settings.networkVertical = true
                 case "text":
                     settings.segments = settings.segments.map { config in
                         var copy = config
@@ -345,7 +350,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    /// 自检：极端数值下状态栏宽度应保持一致（固定槽位生效）
+    /// 自检：极端数值下的内容宽度（稳定宽度的收缩是延迟执行的，所以这里只记录内容宽度）
     private func verifyBarWidth() {
         var low = MetricsSnapshot()
         low.cpu.total = 0.02
@@ -381,8 +386,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let widths = [(low, 42), (mid, 42), (high, 42)].map { pair in
             self.statusBar.width(for: pair.0, count: pair.1)
         }
-        let stable = Set(widths).count == 1
-        NSLog("%@", "DIAG bar widths low/mid/high = \(widths) stable=\(stable)")
+        NSLog("%@", "DIAG bar content widths low/mid/high = \(widths)")
     }
 
     private func captureSettingsTabs() {

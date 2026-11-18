@@ -149,6 +149,7 @@ enum BarBackgroundStyle: String, Codable, CaseIterable, Identifiable {
 }
 
 enum BarTextAlignment: String, Codable, CaseIterable, Identifiable {
+    case leading = "靠左"
     case center = "居中"
     case trailing = "靠右"
     var id: String { rawValue }
@@ -161,8 +162,8 @@ struct BarAppearance: Codable {
     var horizontalPadding: Double = 6
     /// SF Symbol 图标字号
     var iconPointSize: Double = 11
-    /// 数值在预留槽位内的对齐方式
-    var textAlignment: BarTextAlignment = .center
+    /// 状态栏内容在稳定宽度产生的富余空间中的对齐方式
+    var textAlignment: BarTextAlignment = .leading
 
     var backgroundStyle: BarBackgroundStyle = .none
     var backgroundColor: String = "#1E1E1E"
@@ -191,8 +192,9 @@ struct BarAppearance: Codable {
     }
 
     mutating func normalize() {
-        segmentSpacing = min(max(segmentSpacing, -10), 24)
-        horizontalPadding = min(max(horizontalPadding, -10), 24)
+        // 模块之间至少留 5pt：再小相邻模块的文字（数值、徽章）就会粘在一起
+        segmentSpacing = min(max(segmentSpacing, 5), 24)
+        horizontalPadding = min(max(horizontalPadding, 0), 24)
         iconPointSize = min(max(iconPointSize, 8), 18)
         backgroundOpacity = min(max(backgroundOpacity, 0.05), 1)
         cornerRadius = min(max(cornerRadius, 0), 14)
@@ -223,7 +225,7 @@ struct AppSettings: Codable {
     var showCPUWithTemperature: Bool = false
     var barFontSize: Double = 12
     var temperatureMode: TemperatureMode = .average
-    /// 固定每个模块的槽位宽度，避免数值跳动时菜单栏宽度变化
+    /// 数值变小时延迟收窄状态栏，避免数值来回跳时菜单栏跟着伸缩
     var stabilizeBarWidth: Bool = true
 
     /// 网速模块上下排列（下载在上、上传在下），用于节省横向空间
@@ -300,8 +302,8 @@ struct AppSettings: Codable {
         clipboardMaxItems = min(max(clipboardMaxItems, 20), 5000)
         // 左右内边距不能为负：状态栏窗口宽度 = 内容 + 2 × 内边距，负值会把内容裁掉
         appearance.horizontalPadding = min(max(appearance.horizontalPadding, 0), 20)
-        // 模块间距不能为负：负间距等于让相邻分段重叠，文字和徽章会互相压住
-        appearance.segmentSpacing = min(max(appearance.segmentSpacing, 0), 20)
+        // 模块间距至少 5pt：再小相邻模块的文字/徽章就会粘在一起（「48°内存」）
+        appearance.segmentSpacing = min(max(appearance.segmentSpacing, 5), 20)
         clipboardPanelHeight = min(max(clipboardPanelHeight, 300), 900)
         barFontSize = min(max(barFontSize, 10), 16)
     }

@@ -81,8 +81,9 @@ Mac power users and developers often struggle with two notorious menu bar issues
   - **Clipboard Complication Capsule**: Apple Watch-inspired capsule complication badge indicating stored clipboard history count.
 - **Gestalt Proximity Spacing**:
   - Tight 2.5pt anchor between metric labels and numeric values.
-  - Granular sliders: module spacing and side padding both **0–20pt**. Negative *padding* is deliberately disallowed — it narrows the status-item window below its content and clips the bar; with a capsule background a 3pt corner margin is always kept.
-- **Anti-Jitter Physical Slot Width**: Pre-calculates metric glyph bounds so the menu bar remains stable and vibration-free when metrics fluctuate between `0%` and `100%` or `10 KB/s` and `120 MB/s`.
+  - Layout behaves like CSS **`flex + gap`**: every module takes exactly its text width and the gap between modules equals the slider value (**5–20pt**, 5pt minimum so neighbours never touch) — no more leftover slot padding on any module's right side.
+  - Side padding 0–20pt. Negative *padding* is deliberately disallowed — it narrows the status-item window below its content and clips the bar; with a capsule background a 3pt corner margin is always kept.
+- **Anti-Jitter**: the bar grows instantly when a value needs more room and only shrinks after a value has stayed narrower for a few seconds, so metrics flickering between `0%` and `100%` or `10 KB/s` and `120 MB/s` no longer pull the menu bar around.
 - **Aesthetic Background Modes**: Choose between System Native, Custom Solid Tint (hex + opacity), or macOS **Liquid Glass** vibrancy.
 
 ### 2. ⚡ Interactive Segments & Multi-Mode Process Inspector
@@ -106,7 +107,7 @@ Mac power users and developers often struggle with two notorious menu bar issues
 ### 4. 🎨 Liquid Glass Preferences System
 - **6 Focused Preference Tabs**: Status Bar Modules, Appearance, Update Intervals, Clipboard Capacity, Global Hotkeys, and About.
 - **Adaptive Appearance**: Instant switching between `Follow System`, `Light`, and `Night (Dark Glass)`.
-- **Pixel-Level Micro Tuning**: Fine-tune font sizes (9–16pt), icon dimensions, horizontal padding and module spacing (both **0–20pt** — negative values overlap neighbouring segments, so they are no longer accepted), and numeric alignment (Center / Right).
+- **Pixel-Level Micro Tuning**: Fine-tune font sizes (9–16pt), icon dimensions, horizontal padding (**0–20pt**) and module spacing (**5–20pt**, the 5pt floor still keeps neighbouring segments from touching), plus numeric alignment (Left / Center / Right).
 
 ### 5. 🔤 Pocket EN ↔ ZH Mini Translator
 - **One click away, no context switch**: An `A文` button sits in the footer of both the clipboard panel and the process inspector; clicking it opens a 344pt popover without ever leaving the menu bar.
@@ -160,7 +161,7 @@ Mac power users and developers often struggle with two notorious menu bar issues
 | Appearance & Notch Spacing Sliders | Status Bar Module Reordering |
 | :---: | :---: |
 | <img src="docs/screenshots/settings-appearance.png" alt="Appearance Settings" width="420" /> | <img src="docs/screenshots/settings-statusbar.png" alt="Status Bar Settings" width="420" /> |
-| <sub>Spacing and padding sliders (0–20pt) to keep the bar compact under the notch</sub> | <sub>Toggle and reorder 6 modules with icon/text prefix options</sub> |
+| <sub>Module spacing (5–20pt) and padding sliders — gaps are strictly equal, keeping the bar compact under the notch</sub> | <sub>Toggle and reorder 6 modules with icon/text prefix options</sub> |
 
 | Clipboard History Limits & Privacy Filters | Customizable Global Hotkeys |
 | :---: | :---: |
@@ -247,7 +248,7 @@ flowchart TD
     end
 
     subgraph Presentation["Presentation Layer (Main Thread)"]
-        StatusItem["StatusItemView\n(Gestalt Compact Slots + SegmentHitView Hover)"]
+        StatusItem["StatusItemView\n(Equal-spaced flex layout + SegmentHitView Hover)"]
         AppsPanel["RunningAppsPanelView\n(4-Mode Top 5 Process List + Process Kill)"]
         ClipPanel["ClipboardPanelView\n(SwiftUI Responsive Card Panel)"]
         SettingsWin["SettingsWindowController\n(Liquid Glass Preferences Window)"]

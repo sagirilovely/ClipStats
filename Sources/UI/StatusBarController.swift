@@ -3,7 +3,7 @@ import AppKit
 // MARK: - 分段
 
 struct StatusSegment {
-    enum Label {
+    enum Label: Equatable {
         case symbol(String)
         case text(String)
         case none
@@ -13,16 +13,13 @@ struct StatusSegment {
     let kind: SegmentKind?
     let label: Label
     let lines: [String]
-    let templates: [String]
     /// 给数值加一个圆角徽章底（剪贴板只显示数字且没有单位时用）
     let badge: Bool
 
-    init(kind: SegmentKind? = nil, label: Label, lines: [String],
-         templates: [String], badge: Bool = false) {
+    init(kind: SegmentKind? = nil, label: Label, lines: [String], badge: Bool = false) {
         self.kind = kind
         self.label = label
         self.lines = lines
-        self.templates = templates
         self.badge = badge
     }
 }
@@ -40,6 +37,8 @@ struct BarStyle {
     var cornerRadius: CGFloat = 6
     /// nil 表示跟随系统菜单栏颜色
     var textColor: NSColor?
+    /// 数值跳动时是否保持状态栏宽度稳定（只增不减，收缩延迟执行）
+    var stabilizeWidth: Bool = true
 }
 
 // MARK: - 子视图
@@ -99,14 +98,23 @@ private final class SegmentHitView: NSView {
 
 // MARK: - 状态栏视图
 
-/// 自绘状态栏：多段文字 + SF Symbols 图标或文字标签，支持固定槽位、双行排列、背景样式。
+/// 自绘状态栏：多段文字 + SF Symbols 图标或文字标签。
+/// 排布方式等同 CSS 的 flex + gap：每个模块只占真实文字宽度，模块之间是严格等宽的间距。
 final class StatusItemView: NSView {
     var style = BarStyle() {
-        didSet { applyStyle() }
+        didSet {
+            // 外观变化（字号、内边距、对齐……）应当立刻生效，不做收缩延迟
+            resetStableWidth()
+            applyStyle()
+        }
     }
 
     var segments: [StatusSegment] = [] {
-        didSet { rebuildLayout() }
+        didSet {
+            // 只有数值变化时才保留旧宽度；模块增减、标签模式变化属于结构变化，直接贴合
+            if !sameShape(segments, oldValue) { resetStableWidth() }
+            rebuildLayout()
+        }
     }
 
     var isPanelOpen = false {
@@ -149,6 +157,20 @@ final class StatusItemView: NSView {
     private var cachedLayout: [SegmentLayout] = []
     private var hitViews: [SegmentHitView] = []
 
+    /// 当前真正下发给菜单栏的宽度（开启稳定宽度时会比内容宽一点点）
+    private var stableWidth: CGFloat = 0
+    /// 延迟收缩的任务，数值持续变小时才真正收窄
+    private var pendingShrink: DispatchWorkItem?
+
+    /// 结构是否变化：模块增减、标签模式变化时应当立刻贴合新宽度，不做收缩延迟
+    private func sameShape(_ lhs: [StatusSegment], _ rhs: [StatusSegment]) -> Bool {
+        guard lhs.count == rhs.count else { return false }
+        return zip(lhs, rhs).allSatisfy { old, new in
+            old.kind == new.kind && old.label == new.label
+                && old.badge == new.badge && old.lines.isEmpty == new.lines.isEmpty
+        }
+    }
+
     private struct SegmentLayout {
         let kind: SegmentKind?
         let label: StatusSegment.Label
@@ -156,23 +178,17 @@ final class StatusItemView: NSView {
         let rawLabelWidth: CGFloat
         let labelValueGap: CGFloat
         let actualValueWidth: CGFloat
-        let valueSlot: CGFloat
         let lines: [String]
         let lineWidths: [CGFloat]
+        let valueOffsets: [CGFloat]
         let font: NSFont
 
         static let labelValueGapStandard: CGFloat = 2.5
 
+        /// 模块的真实内容宽度：标签 + 标签数值间距 + 最宽的一行数值。
+        /// 布局、高亮、命中全部只用它，模块右侧不会再多出一段「槽位余量」。
         var actualContentWidth: CGFloat {
             rawLabelWidth + labelValueGap + actualValueWidth
-        }
-
-        var contentSlot: CGFloat {
-            rawLabelWidth + labelValueGap + valueSlot
-        }
-
-        var totalWidth: CGFloat {
-            contentSlot
         }
     }
 
@@ -198,25 +214,38 @@ final class StatusItemView: NSView {
 
     private var iconSide: CGFloat { max(10, style.iconPointSize + 3) }
 
-    /// 左右内边距。开启背景时至少留 3pt，否则胶囊圆角会啃到首尾字符；
-    /// 负值只在「无背景」时用于贴边，绝不用来压缩窗口宽度——宽度小于内容时内容会被裁掉。
-    /// 分段之间的实际间距。负的「模块间距」会让相邻分段互相压字（例如 "48°内存" 和 "1.44K19"），
-    /// 因此布局一律按 0 兜底，负值只在设置里保留兼容、实际按 0 处理。
-    private var gap: CGFloat { max(0, style.spacing) }
+    /// 相邻模块之间的最小可见间距。设置里的 0 表示「最紧凑」，
+    /// 但仍然保留这点呼吸空间，否则相邻模块的真实文字会直接贴在一起（「48°内存」）。
+    static let minimumSegmentGap: CGFloat = 5
 
+    /// 数值变小后，等这么久再收窄状态栏，避免数值来回跳时菜单栏跟着抖。
+    /// 必须比采样间隔明显长，否则宽度会在两次采样之间来回伸缩。
+    private static let shrinkDelay: TimeInterval = 4
+
+    /// 模块之间的实际间距：严格按设置排布，并兜住最小值。
+    /// 这就是 CSS 里的 gap——每个模块后面都留同样的距离，不存在「某个模块右侧多一点」。
+    private var gap: CGFloat { max(Self.minimumSegmentGap, style.spacing) }
+
+    /// 左右内边距。开背景时至少留 3pt，否则圆角会啃到首尾字符。
     private var sideInset: CGFloat {
         let minimum: CGFloat = style.backgroundStyle == .none ? 0 : 3
         return max(minimum, style.padding)
     }
 
+    /// 可见内容宽度：模块只算真实文字，模块之间严格使用 gap。
+    private var contentWidth: CGFloat {
+        guard !cachedLayout.isEmpty else { return 0 }
+        let total = cachedLayout.reduce(CGFloat(0)) { $0 + $1.actualContentWidth }
+        return ceil(total + gap * CGFloat(cachedLayout.count - 1))
+    }
+
+    /// 内容起点永远贴左：数值变化只影响自身宽度，不会把整组内容左右推。
+    private var contentStartX: CGFloat { sideInset }
+
     /// 双行排列时使用的字号
     private var verticalFont: NSFont {
         let size = min(10, max(8, style.font.pointSize * 0.72))
         return .monospacedDigitSystemFont(ofSize: size, weight: .regular)
-    }
-
-    private var textAttributes: [NSAttributedString.Key: Any] {
-        [.font: style.font, .foregroundColor: style.textColor ?? NSColor.labelColor]
     }
 
     private func attributes(_ font: NSFont) -> [NSAttributedString.Key: Any] {
@@ -279,6 +308,18 @@ final class StatusItemView: NSView {
         }
     }
 
+    /// 多行数值在实际最宽行内对齐；不把模板余量算进可见内容。
+    private func alignedOffsets(lineWidths: [CGFloat], fieldWidth: CGFloat) -> [CGFloat] {
+        lineWidths.map { lineWidth in
+            let leftover = max(0, fieldWidth - lineWidth)
+            switch style.alignment {
+            case .leading: return 0
+            case .center: return leftover / 2
+            case .trailing: return leftover
+            }
+        }
+    }
+
     private func layout(_ segments: [StatusSegment]) -> [SegmentLayout] {
         segments.map { segment in
             let font = segment.lines.count > 1 ? verticalFont : style.font
@@ -289,56 +330,48 @@ final class StatusItemView: NSView {
             default: hasLabel = true
             }
             let hasValue = !segment.lines.isEmpty
-            let gap = (hasLabel && hasValue) ? SegmentLayout.labelValueGapStandard : 0.0
+            let labelGap = (hasLabel && hasValue) ? SegmentLayout.labelValueGapStandard : 0.0
 
             if segment.badge {
-                let countText = segment.lines.first ?? "0"
-                let actualVal = badgeWidth(for: countText)
-                let templateText = segment.templates.first ?? countText
-                let templateVal = badgeWidth(for: templateText)
-                let valueSlot = max(actualVal, templateVal)
+                let actualVal = badgeWidth(for: segment.lines.first ?? "0")
+                let lineWidths = [actualVal]
                 return SegmentLayout(
                     kind: segment.kind,
                     label: segment.label,
                     badge: true,
                     rawLabelWidth: rawLabel,
-                    labelValueGap: gap,
+                    labelValueGap: labelGap,
                     actualValueWidth: actualVal,
-                    valueSlot: valueSlot,
                     lines: segment.lines,
-                    lineWidths: [actualVal],
+                    lineWidths: lineWidths,
+                    valueOffsets: alignedOffsets(lineWidths: lineWidths, fieldWidth: actualVal),
                     font: badgeFont
                 )
             } else {
                 let lineWidths = segment.lines.map { width($0, font: font) }
-                let templateWidths = segment.templates.map { width($0, font: font) }
                 let actualVal = lineWidths.max() ?? 0
-                let templateVal = templateWidths.max() ?? 0
-                let valueSlot = max(actualVal, templateVal)
                 return SegmentLayout(
                     kind: segment.kind,
                     label: segment.label,
                     badge: false,
                     rawLabelWidth: rawLabel,
-                    labelValueGap: gap,
+                    labelValueGap: labelGap,
                     actualValueWidth: actualVal,
-                    valueSlot: valueSlot,
                     lines: segment.lines,
                     lineWidths: lineWidths,
+                    valueOffsets: alignedOffsets(lineWidths: lineWidths, fieldWidth: actualVal),
                     font: font
                 )
             }
         }
     }
 
+    /// 内容 + 左右内边距；这就是状态栏项真正需要的宽度，不再额外预留槽位。
     private func totalWidth(of items: [SegmentLayout]) -> CGFloat {
-        var contentTotal: CGFloat = 0
-        for (index, item) in items.enumerated() {
-            if index > 0 { contentTotal += gap }
-            contentTotal += item.totalWidth
-        }
-        let total = contentTotal + sideInset * 2
-        return ceil(max(20, total))
+        guard !items.isEmpty else { return 20 }
+        let content = items.reduce(CGFloat(0)) { $0 + $1.actualContentWidth }
+            + gap * CGFloat(items.count - 1)
+        return ceil(max(20, content + sideInset * 2))
     }
 
     /// 自检：直接用 AppKit 做命中测试，验证点击会落到哪个分段
@@ -359,19 +392,15 @@ final class StatusItemView: NSView {
 
     var debugHitViewCount: Int { hitViews.count }
 
-    /// 自检：返回每个分段对应的点击区间
+    /// 自检：返回每个分段真实内容对应的点击区间
     func debugSegmentRects() -> [(String, NSRect)] {
-        let contentTotal = cachedLayout.enumerated().reduce(CGFloat(0)) { sum, elem in
-            sum + elem.element.totalWidth + (elem.offset > 0 ? gap : 0)
-        }
-        let startX = max(0, sideInset)
-        var x = startX
+        var x = contentStartX
         var result: [(String, NSRect)] = []
         for (index, item) in cachedLayout.enumerated() {
             if index > 0 { x += gap }
             result.append((item.kind?.rawValue ?? "nil",
-                           NSRect(x: x, y: 0, width: item.totalWidth, height: bounds.height)))
-            x += item.totalWidth
+                           NSRect(x: x, y: 0, width: item.actualContentWidth, height: bounds.height)))
+            x += item.actualContentWidth
         }
         return result
     }
@@ -383,7 +412,50 @@ final class StatusItemView: NSView {
 
     func rebuildLayout() {
         cachedLayout = layout(segments)
-        let width = totalWidth(of: cachedLayout)
+        updateWidth()
+        contentView.needsDisplay = true
+        needsDisplay = true
+    }
+
+    /// 目标宽度 = 真实内容 + 左右内边距。
+    /// 开启「稳定宽度」时宽度只增不减，收缩会延迟执行——菜单栏在数值来回跳时纹丝不动。
+    private func updateWidth() {
+        let target = totalWidth(of: cachedLayout)
+        if !style.stabilizeWidth {
+            resetStableWidth()
+            stableWidth = target
+        } else if target > stableWidth + 0.5 {
+            resetStableWidth()
+            stableWidth = target
+        } else if target < stableWidth - 0.5 {
+            scheduleShrink(to: target)
+        }
+        applyWidth()
+    }
+
+    private func scheduleShrink(to target: CGFloat) {
+        pendingShrink?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            self.pendingShrink = nil
+            guard self.style.stabilizeWidth, self.stableWidth > target + 0.5 else { return }
+            self.stableWidth = target
+            self.applyWidth()
+            self.contentView.needsDisplay = true
+            self.needsDisplay = true
+        }
+        pendingShrink = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.shrinkDelay, execute: work)
+    }
+
+    private func resetStableWidth() {
+        pendingShrink?.cancel()
+        pendingShrink = nil
+        stableWidth = 0
+    }
+
+    private func applyWidth() {
+        let width = max(20, stableWidth)
         let height = NSStatusBar.system.thickness
         if let statusItem {
             statusItem.length = width
@@ -392,8 +464,6 @@ final class StatusItemView: NSView {
         contentView.frame = bounds
         effectView?.frame = backgroundRect()
         rebuildHitAreas()
-        contentView.needsDisplay = true
-        needsDisplay = true
     }
 
     /// 为每个分段铺设透明命中视图（包含分段本身与中间留白，避免点击盲区）
@@ -401,17 +471,13 @@ final class StatusItemView: NSView {
         hitViews.forEach { $0.removeFromSuperview() }
         hitViews.removeAll()
 
-        let contentTotal = cachedLayout.enumerated().reduce(CGFloat(0)) { sum, elem in
-            sum + elem.element.totalWidth + (elem.offset > 0 ? gap : 0)
-        }
-        let startX = max(0, sideInset)
-        var x = startX
+        var x = contentStartX
 
         for (index, item) in cachedLayout.enumerated() {
             let leftBoundary = (index == 0) ? 0 : (x - gap / 2)
             let rightBoundary = (index == cachedLayout.count - 1)
                 ? bounds.width
-                : (x + item.totalWidth + gap / 2)
+                : (x + item.actualContentWidth + gap / 2)
             let hitFrame = NSRect(
                 x: max(0, leftBoundary),
                 y: 0,
@@ -435,7 +501,7 @@ final class StatusItemView: NSView {
             }
             addSubview(hitView)
             hitViews.append(hitView)
-            x += item.totalWidth + gap
+            x += item.actualContentWidth + gap
         }
     }
 
@@ -464,7 +530,16 @@ final class StatusItemView: NSView {
     }
 
     private func backgroundRect() -> NSRect {
-        bounds.insetBy(dx: 1, dy: 2)
+        // 背景正好等于「内容 + 左右内边距」；宽度稳定保留的那点余量留在右侧且保持透明，
+        // 不会再出现右边多出一截背景色的情况。
+        let visibleWidth = min(bounds.width, contentWidth + sideInset * 2)
+        let rect = NSRect(
+            x: 0,
+            y: 2,
+            width: max(2, visibleWidth),
+            height: max(2, bounds.height - 4)
+        )
+        return rect.insetBy(dx: 1, dy: 0)
     }
 
     // MARK: - 绘制
@@ -512,11 +587,7 @@ final class StatusItemView: NSView {
             cachedLayout = layout(segments)
         }
 
-        let contentTotal = cachedLayout.enumerated().reduce(CGFloat(0)) { sum, elem in
-            sum + elem.element.totalWidth + (elem.offset > 0 ? gap : 0)
-        }
-        let startX = max(0, sideInset)
-        var x = startX
+        var x = contentStartX
 
         for (index, item) in cachedLayout.enumerated() {
             if index > 0 { x += gap }
@@ -524,9 +595,15 @@ final class StatusItemView: NSView {
             let isActive = isPanelOpen && (item.kind != nil && item.kind == activeSegmentKind)
             let isHovered = (hoveredIndex == index) || (debugHover && (debugHoverIndex == nil ? index == 0 : debugHoverIndex == index))
 
-            // 1. 悬停 / 激活时仅高亮当前分段（胶囊左右各微展 1.5pt，呈现精致按钮质感）
+            // 1. 高亮胶囊在真实内容左右各留同样的一点内边距，不会一边宽一边窄
             if (isActive || isHovered) && !item.badge {
-                let pillRect = NSRect(x: x - 1.5, y: 2.5, width: item.totalWidth + 3.0, height: bounds.height - 5)
+                let pillPad = max(1.5, min(2.5, gap * 0.4))
+                let pillRect = NSRect(
+                    x: x - pillPad,
+                    y: 2.5,
+                    width: item.actualContentWidth + pillPad * 2,
+                    height: bounds.height - 5
+                )
                 drawSegmentHighlight(in: pillRect, isActive: isActive, isHovered: isHovered)
             }
 
@@ -553,8 +630,7 @@ final class StatusItemView: NSView {
             if !item.lines.isEmpty {
                 if item.badge {
                     let countText = item.lines.first ?? "0"
-                    let leftover = max(0, item.valueSlot - item.actualValueWidth)
-                    let badgeOffset = (style.alignment == .center) ? leftover / 2 : (style.alignment == .trailing ? leftover : 0)
+                    let badgeOffset = item.valueOffsets.first ?? 0
                     let badgeRect = NSRect(
                         x: currentX + badgeOffset,
                         y: (bounds.height - 15.0) / 2,
@@ -572,7 +648,7 @@ final class StatusItemView: NSView {
                 }
             }
 
-            x += item.totalWidth
+            x += item.actualContentWidth
         }
     }
 
@@ -676,27 +752,10 @@ final class StatusItemView: NSView {
     private func drawLines(_ item: SegmentLayout, at x: CGFloat) {
         let attrs = attributes(item.font)
 
-        let hasLabel: Bool
-        switch item.label {
-        case .none: hasLabel = false
-        default: hasLabel = true
-        }
-
         if item.lines.count == 1 {
             let text = item.lines[0]
             let size = (text as NSString).size(withAttributes: attrs)
-            // 当有前置标签（如 CPU、GPU、内存）时，数值紧跟标签，偏移恒为 0，确保数值始终跟随名称；
-            // 仅在无标签独立显示数值时，才在预留槽位内部居中 / 靠右对齐。
-            let offset: CGFloat
-            if hasLabel {
-                offset = 0
-            } else {
-                let leftover = max(0, item.valueSlot - item.lineWidths[0])
-                switch style.alignment {
-                case .center: offset = leftover / 2
-                case .trailing: offset = leftover
-                }
-            }
+            let offset = item.valueOffsets.first ?? 0
             (text as NSString).draw(
                 at: NSPoint(x: x + offset, y: (bounds.height - size.height) / 2),
                 withAttributes: attrs
@@ -704,7 +763,7 @@ final class StatusItemView: NSView {
             return
         }
 
-        // 双行：第一行在上，第二行在下
+        // 双行：第一行在上，第二行在下；两行只在实际最宽行内对齐，不带模板余量。
         let font = item.font
         let lineHeight = ceil(font.ascender - font.descender + font.leading)
         let total = lineHeight * CGFloat(item.lines.count)
@@ -712,16 +771,7 @@ final class StatusItemView: NSView {
 
         for (lineIndex, text) in item.lines.enumerated() {
             let size = (text as NSString).size(withAttributes: attrs)
-            let offset: CGFloat
-            if hasLabel {
-                offset = 0
-            } else {
-                let leftover = max(0, item.valueSlot - (item.lineWidths[safe: lineIndex] ?? size.width))
-                switch style.alignment {
-                case .center: offset = leftover / 2
-                case .trailing: offset = leftover
-                }
-            }
+            let offset = item.valueOffsets[safe: lineIndex] ?? 0
             let y = startY + CGFloat(item.lines.count - 1 - lineIndex) * lineHeight
             (text as NSString).draw(
                 at: NSPoint(x: x + offset, y: y + (lineHeight - size.height) / 2),
@@ -798,21 +848,17 @@ final class StatusItemView: NSView {
     private func segmentIndex(atX rawX: CGFloat) -> Int? {
         guard !cachedLayout.isEmpty else { return nil }
         let clamped = min(max(rawX, 0), bounds.width)
-        let contentTotal = cachedLayout.enumerated().reduce(CGFloat(0)) { sum, elem in
-            sum + elem.element.totalWidth + (elem.offset > 0 ? gap : 0)
-        }
-        let startX = max(0, sideInset)
-        var x = startX
+        var x = contentStartX
 
         for (index, item) in cachedLayout.enumerated() {
             let leftBoundary = (index == 0) ? 0 : (x - gap / 2)
             let rightBoundary = (index == cachedLayout.count - 1)
                 ? bounds.width
-                : (x + item.totalWidth + gap / 2)
+                : (x + item.actualContentWidth + gap / 2)
             if clamped >= leftBoundary && clamped < rightBoundary {
                 return index
             }
-            x += item.totalWidth + gap
+            x += item.actualContentWidth + gap
         }
         return nil
     }
@@ -953,6 +999,7 @@ final class StatusBarController {
             .withAlphaComponent(CGFloat(appearance.backgroundOpacity))
         style.cornerRadius = CGFloat(appearance.cornerRadius)
         style.textColor = appearance.useCustomTextColor ? ColorHex.nsColor(appearance.textColor) : nil
+        style.stabilizeWidth = settings.stabilizeBarWidth
         return style
     }
 
@@ -975,58 +1022,27 @@ final class StatusBarController {
             }
 
             var lines: [String] = []
-            var templates: [String] = []
             if config.showText {
                 lines = valueLines(for: config.kind, snapshot: snapshot, count: count, settings: settings)
-                if settings.stabilizeBarWidth {
-                    templates = templateLines(for: config.kind, count: count, settings: settings)
-                }
             }
 
             let needsBadge = config.kind == .clipboard
                 && config.labelMode == .none
                 && config.showText
-            segments.append(StatusSegment(kind: config.kind, label: label, lines: lines,
-                                          templates: templates, badge: needsBadge))
+            segments.append(StatusSegment(kind: config.kind, label: label,
+                                          lines: lines, badge: needsBadge))
         }
 
         if segments.isEmpty {
-            segments = [StatusSegment(label: .symbol("chart.bar"), lines: [], templates: [])]
+            segments = [StatusSegment(label: .symbol("chart.bar"), lines: [])]
         }
         return segments
     }
 
-    /// 自检：给定快照时状态栏应有的宽度
+    /// 自检：给定快照时状态栏内容应有的宽度
     func width(for snapshot: MetricsSnapshot, count: Int) -> CGFloat {
         let segments = buildSegments(snapshot: snapshot, count: count, settings: settingsStore.settings)
         return view.measuredWidth(for: segments)
-    }
-
-    private func templateLines(for kind: SegmentKind, count: Int, settings: AppSettings) -> [String] {
-        switch kind {
-        // 模板一律取「最宽形态」：100% / 100° 比 99% / 99° 多一个字符，
-        // 用窄模板会在数值跳到 100 时把状态栏顶宽，固定槽位就白做了
-        case .cpu:
-            return [settings.showCPUWithTemperature ? "100% 100°" : "100%"]
-        case .gpu:
-            return ["100%"]
-        case .memory:
-            return ["100%"]
-        case .thermal:
-            return ["100°"]
-        case .network:
-            // Fmt.speed 最长输出形如 "84.0K" / "1.15M"（5 个字符），预留同宽
-            // 上下排列时上传在上、下载在下
-            return settings.networkVertical ? ["↑9.99M", "↓9.99M"] : ["↓9.99M ↑9.99M"]
-        case .clipboard:
-            if count < 10 {
-                return ["9"]
-            } else if count < 100 {
-                return ["99"]
-            } else {
-                return ["999"]
-            }
-        }
     }
 
     private func valueLines(for kind: SegmentKind, snapshot: MetricsSnapshot,

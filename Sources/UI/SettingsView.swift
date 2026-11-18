@@ -275,9 +275,9 @@ struct SettingsView: View {
                 .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(.secondary)
 
-            HStack(spacing: 10) {
+            HStack(spacing: CGFloat(max(5, store.settings.appearance.segmentSpacing))) {
                 ForEach(store.settings.segments.filter { $0.enabled }) { segment in
-                    HStack(spacing: 4) {
+                    HStack(spacing: 2.5) {
                         switch segment.labelMode {
                         case .symbol:
                             Image(systemName: segment.kind.symbolName).font(.system(size: 10))
@@ -342,8 +342,8 @@ struct SettingsView: View {
                     VStack(alignment: .leading, spacing: 12) {
                         sliderRow("字号大小", value: binding(\.barFontSize), range: 10...16, step: 1, suffix: "pt")
                         sliderRow("图标大小", value: binding(\.appearance.iconPointSize), range: 8...18, step: 1, suffix: "pt")
-                        sliderRow("模块间距", value: binding(\.appearance.segmentSpacing), range: 0...20, step: 1, suffix: "pt")
-                        Text("间距最小 0：负值会让相邻模块互相压字（例如「48°内存」「1.44K19」），已不再允许。")
+                        sliderRow("模块间距", value: binding(\.appearance.segmentSpacing), range: 5...20, step: 1, suffix: "pt")
+                        Text("模块间距就是 CSS 的 gap：相邻模块真实文字之间的距离，每个模块后面都留同样宽。最小 5pt，再小会粘字。")
                             .font(.system(size: 10.5))
                             .foregroundStyle(.tertiary)
                         sliderRow("左右内边距", value: binding(\.appearance.horizontalPadding), range: 0...20, step: 1, suffix: "pt")
@@ -365,6 +365,9 @@ struct SettingsView: View {
                             .pickerStyle(.segmented)
                             .labelsHidden()
                             .frame(width: 170)
+                            Text("双行数值（如上下排列的网速）在各自列内的对齐方式；不影响模块间距")
+                                .font(.system(size: 10.5))
+                                .foregroundStyle(.secondary)
                             Spacer()
                         }
 
@@ -385,8 +388,13 @@ struct SettingsView: View {
                             Spacer()
                         }
 
-                        Toggle("固定槽位宽度（数值变动时不抖动）", isOn: binding(\.stabilizeBarWidth))
-                            .font(.system(size: 12))
+                        VStack(alignment: .leading, spacing: 3) {
+                            Toggle("稳定状态栏总宽度（数值变化不挤动菜单栏）", isOn: binding(\.stabilizeBarWidth))
+                                .font(.system(size: 12))
+                            Text("数值变小时不会立刻收窄：持续变小几秒后才收缩，跳动的数字不会牵着菜单栏一起抖。")
+                                .font(.system(size: 10.5))
+                                .foregroundStyle(.tertiary)
+                        }
                     }
                 }
 
