@@ -100,6 +100,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                         copy.labelMode = .text
                         return copy
                     }
+                case "perf-default":
+                    settings.metricsInterval = 1
+                    settings.thermalInterval = 3
+                    settings.clipboardPollInterval = 0.3
+                case "perf-fast":
+                    settings.metricsInterval = 0.5
+                    settings.thermalInterval = 1
+                    settings.clipboardPollInterval = 0.2
                 case "textvertical":
                     settings.networkVertical = true
                     settings.appearance.segmentSpacing = 4
