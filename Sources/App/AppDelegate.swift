@@ -42,6 +42,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.appsController.hide()
             self?.openSettingsWindow()
         }
+        appsController.model.onSwitchToClipboard = { [weak self] in
+            guard let self else { return }
+            self.appsController.hide()
+            self.panelController.show(anchor: self.statusBar.anchorFrame)
+        }
+        panelController.model.onSwitchToRunningApps = { [weak self] in
+            guard let self else { return }
+            self.panelController.hide()
+            self.appsController.show(anchor: self.statusBar.anchorFrame)
+        }
         panelController.onVisibilityChange = { [weak self] visible in
             self?.statusBar.setPanelOpen(visible)
         }

@@ -724,7 +724,7 @@ struct SettingsView: View {
                                 Text("ClipStats")
                                     .font(.system(size: 18, weight: .bold))
                                 HStack(spacing: 6) {
-                                    Text("版本 0.1.0")
+                                    Text("版本 \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—")")
                                         .font(.system(size: 11))
                                         .foregroundStyle(.secondary)
                                     Text("arm64 原生")

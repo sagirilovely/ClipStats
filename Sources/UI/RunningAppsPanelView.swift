@@ -120,6 +120,23 @@ struct RunningAppsPanelView: View {
                 .foregroundStyle(.tertiary)
 
             Button {
+                model.onSwitchToClipboard?()
+            } label: {
+                Image(systemName: "doc.on.clipboard")
+                    .font(.system(size: 11, weight: .medium))
+                    .padding(5)
+                    .background(Color.primary.opacity(0.04))
+                    .clipShape(Circle())
+                    .overlay(
+                        Circle().strokeBorder(Color.white.opacity(0.15), lineWidth: 0.6)
+                    )
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.secondary)
+            .help("切换到剪贴板历史")
+            .accessibilityLabel("切换到剪贴板历史")
+
+            Button {
                 model.onOpenSettings?()
             } label: {
                 Image(systemName: "gearshape")

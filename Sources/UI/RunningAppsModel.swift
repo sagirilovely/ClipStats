@@ -31,6 +31,8 @@ final class RunningAppsModel: ObservableObject {
     @Published var hoveredPID: pid_t?
     /// 由 AppDelegate 注入：打开设置窗口
     var onOpenSettings: (() -> Void)?
+    /// 由 AppDelegate 注入：切换到剪贴板历史面板
+    var onSwitchToClipboard: (() -> Void)?
 
     private var verificationWork: [pid_t: DispatchWorkItem] = [:]
 

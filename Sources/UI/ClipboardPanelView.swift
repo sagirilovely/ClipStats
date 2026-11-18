@@ -261,6 +261,24 @@ struct ClipboardPanelView: View {
             }
             .buttonStyle(.plain)
 
+            // 切换到进程列表
+            Button {
+                model.switchToRunningApps()
+            } label: {
+                Image(systemName: "macwindow.on.rectangle")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .padding(5)
+                    .background(Color.primary.opacity(0.04))
+                    .clipShape(Circle())
+                    .overlay(
+                        Circle().strokeBorder(Color.white.opacity(0.15), lineWidth: 0.6)
+                    )
+            }
+            .buttonStyle(.plain)
+            .help("切换到进程列表")
+            .accessibilityLabel("切换到进程列表")
+
             // 设置按钮
             Button {
                 model.openSettings()

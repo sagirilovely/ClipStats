@@ -57,6 +57,8 @@ final class ClipboardPanelModel: ObservableObject {
 
     var onRestore: ((ClipboardStore.Item) -> Void)?
     var onRequestSettings: (() -> Void)?
+    /// 由 AppDelegate 注入：切换到「正在运行的应用程序」面板
+    var onSwitchToRunningApps: (() -> Void)?
     var onRequestQuit: (() -> Void)?
     var onTogglePause: ((Bool) -> Void)?
     var onClearAll: (() -> Void)?
@@ -94,6 +96,10 @@ final class ClipboardPanelModel: ObservableObject {
 
     func openSettings() {
         onRequestSettings?()
+    }
+
+    func switchToRunningApps() {
+        onSwitchToRunningApps?()
     }
 
     func quit() {
