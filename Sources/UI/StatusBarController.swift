@@ -198,6 +198,13 @@ final class StatusItemView: NSView {
 
     private var iconSide: CGFloat { max(10, style.iconPointSize + 3) }
 
+    /// 左右内边距。开启背景时至少留 3pt，否则胶囊圆角会啃到首尾字符；
+    /// 负值只在「无背景」时用于贴边，绝不用来压缩窗口宽度——宽度小于内容时内容会被裁掉。
+    private var sideInset: CGFloat {
+        let minimum: CGFloat = style.backgroundStyle == .none ? 0 : 3
+        return max(minimum, style.padding)
+    }
+
     /// 双行排列时使用的字号
     private var verticalFont: NSFont {
         let size = min(10, max(8, style.font.pointSize * 0.72))
@@ -213,6 +220,9 @@ final class StatusItemView: NSView {
     }
 
     private func applyStyle() {
+        if ProcessInfo.processInfo.environment["CLIPSTATS_DIAG"] == "1" {
+            NSLog("%@", "DIAG bar style background=\(style.backgroundStyle) color=\(style.backgroundColor) radius=\(style.cornerRadius) padding=\(style.padding) text=\(String(describing: style.textColor))")
+        }
         if let effectView {
             effectView.removeFromSuperview()
             self.effectView = nil
@@ -323,7 +333,7 @@ final class StatusItemView: NSView {
             if index > 0 { contentTotal += style.spacing }
             contentTotal += item.totalWidth
         }
-        let total = contentTotal + style.padding * 2
+        let total = contentTotal + sideInset * 2
         return ceil(max(20, total))
     }
 
@@ -350,7 +360,7 @@ final class StatusItemView: NSView {
         let contentTotal = cachedLayout.enumerated().reduce(CGFloat(0)) { sum, elem in
             sum + elem.element.totalWidth + (elem.offset > 0 ? style.spacing : 0)
         }
-        let startX: CGFloat = (style.padding < 0) ? max(0, (bounds.width - contentTotal) / 2) : max(0, style.padding)
+        let startX = max(0, sideInset)
         var x = startX
         var result: [(String, NSRect)] = []
         for (index, item) in cachedLayout.enumerated() {
@@ -390,7 +400,7 @@ final class StatusItemView: NSView {
         let contentTotal = cachedLayout.enumerated().reduce(CGFloat(0)) { sum, elem in
             sum + elem.element.totalWidth + (elem.offset > 0 ? style.spacing : 0)
         }
-        let startX: CGFloat = (style.padding < 0) ? max(0, (bounds.width - contentTotal) / 2) : max(0, style.padding)
+        let startX = max(0, sideInset)
         var x = startX
 
         for (index, item) in cachedLayout.enumerated() {
@@ -466,7 +476,12 @@ final class StatusItemView: NSView {
     private func drawBackground() {
         guard style.backgroundStyle != .none else { return }
         let rect = backgroundRect()
-        let path = NSBezierPath(roundedRect: rect, xRadius: style.cornerRadius, yRadius: style.cornerRadius)
+        if ProcessInfo.processInfo.environment["CLIPSTATS_DIAG"] == "1" {
+            NSLog("%@", "DIAG bar background rect=\(rect) bounds=\(bounds) corner=\(style.cornerRadius)")
+        }
+        // 圆角超过半高时收敛为胶囊，避免路径退化
+        let radius = min(max(2, style.cornerRadius), rect.height / 2)
+        let path = NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius)
         switch style.backgroundStyle {
         case .none:
             break
@@ -474,14 +489,15 @@ final class StatusItemView: NSView {
             style.backgroundColor.setFill()
             path.fill()
         case .glass:
-            if let gradient = NSGradient(starting: NSColor.white.withAlphaComponent(0.16),
-                                         ending: NSColor.white.withAlphaComponent(0.04)) {
+            // 只叠一点点白光，主要靠背后的 vibrancy 出质感，避免看起来像一块灰板
+            if let gradient = NSGradient(starting: NSColor.white.withAlphaComponent(0.12),
+                                         ending: NSColor.white.withAlphaComponent(0.02)) {
                 gradient.draw(in: path, angle: -90)
             } else {
-                NSColor.white.withAlphaComponent(0.08).setFill()
+                NSColor.white.withAlphaComponent(0.06).setFill()
                 path.fill()
             }
-            NSColor.white.withAlphaComponent(0.28).setStroke()
+            NSColor.white.withAlphaComponent(0.22).setStroke()
             path.lineWidth = 0.8
             path.stroke()
         }
@@ -495,7 +511,7 @@ final class StatusItemView: NSView {
         let contentTotal = cachedLayout.enumerated().reduce(CGFloat(0)) { sum, elem in
             sum + elem.element.totalWidth + (elem.offset > 0 ? style.spacing : 0)
         }
-        let startX: CGFloat = (style.padding < 0) ? max(0, (bounds.width - contentTotal) / 2) : max(0, style.padding)
+        let startX = max(0, sideInset)
         var x = startX
 
         for (index, item) in cachedLayout.enumerated() {
@@ -597,11 +613,13 @@ final class StatusItemView: NSView {
         let radius = rect.height / 2
         let path = NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius)
 
-        // 1. 胶囊背景：半透明强调色渐变
-        let topAlpha: CGFloat = (isActive || isHovered) ? 0.36 : 0.22
-        let bottomAlpha: CGFloat = (isActive || isHovered) ? 0.20 : 0.10
-        let topColor = NSColor.controlAccentColor.withAlphaComponent(topAlpha)
-        let bottomColor = NSColor.controlAccentColor.withAlphaComponent(bottomAlpha)
+        // 1. 胶囊背景：跟随文字颜色的半透明玻璃，
+        //    这样在纯色 / 毛玻璃背景下不会像一块突兀的强调色贴纸
+        let base = style.textColor ?? NSColor.labelColor
+        let topAlpha: CGFloat = (isActive || isHovered) ? 0.30 : 0.20
+        let bottomAlpha: CGFloat = (isActive || isHovered) ? 0.16 : 0.08
+        let topColor = base.withAlphaComponent(topAlpha)
+        let bottomColor = base.withAlphaComponent(bottomAlpha)
 
         if let gradient = NSGradient(starting: topColor, ending: bottomColor) {
             gradient.draw(in: path, angle: -90)
@@ -610,9 +628,8 @@ final class StatusItemView: NSView {
             path.fill()
         }
 
-        // 2. 边缘微光高光边框
-        let strokeAlpha: CGFloat = (isActive || isHovered) ? 0.45 : 0.28
-        NSColor.white.withAlphaComponent(strokeAlpha).setStroke()
+        // 2. 同色描边（不再用纯白，浅色背景上会发亮）
+        base.withAlphaComponent((isActive || isHovered) ? 0.40 : 0.26).setStroke()
         path.lineWidth = 0.65
         path.stroke()
 
@@ -780,7 +797,7 @@ final class StatusItemView: NSView {
         let contentTotal = cachedLayout.enumerated().reduce(CGFloat(0)) { sum, elem in
             sum + elem.element.totalWidth + (elem.offset > 0 ? style.spacing : 0)
         }
-        let startX: CGFloat = (style.padding < 0) ? max(0, (bounds.width - contentTotal) / 2) : max(0, style.padding)
+        let startX = max(0, sideInset)
         var x = startX
 
         for (index, item) in cachedLayout.enumerated() {
@@ -983,14 +1000,16 @@ final class StatusBarController {
 
     private func templateLines(for kind: SegmentKind, count: Int, settings: AppSettings) -> [String] {
         switch kind {
+        // 模板一律取「最宽形态」：100% / 100° 比 99% / 99° 多一个字符，
+        // 用窄模板会在数值跳到 100 时把状态栏顶宽，固定槽位就白做了
         case .cpu:
-            return [settings.showCPUWithTemperature ? "99% 99°" : "99%"]
+            return [settings.showCPUWithTemperature ? "100% 100°" : "100%"]
         case .gpu:
-            return ["99%"]
+            return ["100%"]
         case .memory:
-            return ["99%"]
+            return ["100%"]
         case .thermal:
-            return ["99°"]
+            return ["100°"]
         case .network:
             // Fmt.speed 最长输出形如 "84.0K" / "1.15M"（5 个字符），预留同宽
             // 上下排列时上传在上、下载在下

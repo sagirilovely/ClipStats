@@ -343,7 +343,12 @@ struct SettingsView: View {
                         sliderRow("字号大小", value: binding(\.barFontSize), range: 10...16, step: 1, suffix: "pt")
                         sliderRow("图标大小", value: binding(\.appearance.iconPointSize), range: 8...18, step: 1, suffix: "pt")
                         sliderRow("模块间距", value: binding(\.appearance.segmentSpacing), range: -10...20, step: 1, suffix: "pt")
-                        sliderRow("左右内边距", value: binding(\.appearance.horizontalPadding), range: -10...20, step: 1, suffix: "pt")
+                        sliderRow("左右内边距", value: binding(\.appearance.horizontalPadding), range: 0...20, step: 1, suffix: "pt")
+                        if store.settings.appearance.backgroundStyle != .none {
+                            Text("开背景时左右会额外保留至少 3pt，避免圆角啃到首尾文字。")
+                                .font(.system(size: 10.5))
+                                .foregroundStyle(.tertiary)
+                        }
 
                         Divider().opacity(0.3)
 

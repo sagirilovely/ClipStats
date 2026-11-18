@@ -79,7 +79,7 @@ Mac power users and developers often struggle with two notorious menu bar issues
   - **Clipboard Complication Capsule**: Apple Watch-inspired capsule complication badge indicating stored clipboard history count.
 - **Gestalt Proximity Spacing**:
   - Tight 2.5pt anchor between metric labels and numeric values.
-  - Granular spacing sliders adjustable from **-10pt to 20pt**, allowing users to squeeze menu bar width to the extreme for MacBook notch displays.
+  - Granular sliders: module spacing **-10pt to 20pt**, side padding **0–20pt**. Negative *padding* is deliberately disallowed — it narrows the status-item window below its content and clips the bar; with a capsule background a 3pt corner margin is always kept.
 - **Anti-Jitter Physical Slot Width**: Pre-calculates metric glyph bounds so the menu bar remains stable and vibration-free when metrics fluctuate between `0%` and `100%` or `10 KB/s` and `120 MB/s`.
 - **Aesthetic Background Modes**: Choose between System Native, Custom Solid Tint (hex + opacity), or macOS **Liquid Glass** vibrancy.
 

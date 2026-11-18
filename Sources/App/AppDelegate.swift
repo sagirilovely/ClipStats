@@ -342,7 +342,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         mid.network.download = 1_204_000
         mid.network.upload = 86_000
 
-        let widths = [(low, 1), (mid, 42), (high, 999)].map { pair in
+        // 用同一个条数比较，否则徽章位数（9/99/999）变化会被当成宽度抖动
+        let widths = [(low, 42), (mid, 42), (high, 42)].map { pair in
             self.statusBar.width(for: pair.0, count: pair.1)
         }
         let stable = Set(widths).count == 1

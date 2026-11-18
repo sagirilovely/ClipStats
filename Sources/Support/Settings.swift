@@ -298,6 +298,8 @@ struct AppSettings: Codable {
         thermalInterval = min(max(thermalInterval, 1), 30)
         clipboardPollInterval = min(max(clipboardPollInterval, 0.2), 5)
         clipboardMaxItems = min(max(clipboardMaxItems, 20), 5000)
+        // 左右内边距不能为负：状态栏窗口宽度 = 内容 + 2 × 内边距，负值会把内容裁掉
+        appearance.horizontalPadding = min(max(appearance.horizontalPadding, 0), 20)
         clipboardPanelHeight = min(max(clipboardPanelHeight, 300), 900)
         barFontSize = min(max(barFontSize, 10), 16)
     }
