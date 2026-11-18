@@ -24,7 +24,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panelController = ClipboardPanelController()
         appsController = RunningAppsPanelController()
 
-        // 点剪贴板分段 → 剪贴板历史；点其它任意位置 → 正在运行的应用程序
+        // 点剪贴板分段 → 剪贴板历史；点其它任意模块 → 正在运行的应用程序（自动定位并高亮对应分类）
         statusBar.onSegmentClick = { [weak self] kind, anchor in
             guard let self else { return }
             if kind == .clipboard {
@@ -32,13 +32,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self.panelController.toggle(anchor: anchor)
             } else {
                 self.panelController.hide()
-                self.appsController.model.mode = Self.metricMode(for: kind)
-                self.appsController.model.metrics = self.latest
-                self.appsController.toggle(anchor: anchor)
+                let targetMode = Self.metricMode(for: kind)
+                if self.appsController.isVisible && self.appsController.model.mode == targetMode {
+                    self.appsController.hide()
+                } else {
+                    self.appsController.model.mode = targetMode
+                    self.appsController.model.metrics = self.latest
+                    self.appsController.show(anchor: anchor)
+                }
             }
         }
         appsController.onVisibilityChange = { [weak self] visible in
-            self?.statusBar.setPanelOpen(visible)
+            guard let self else { return }
+            let kind = visible ? Self.segmentKind(for: self.appsController.model.mode) : nil
+            self.statusBar.setPanelOpen(visible, for: kind)
+        }
+        appsController.model.onModeChange = { [weak self] newMode in
+            guard let self, self.appsController.isVisible else { return }
+            self.statusBar.setActiveSegment(Self.segmentKind(for: newMode))
         }
         appsController.model.onOpenSettings = { [weak self] in
             self?.appsController.hide()
@@ -55,7 +66,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self.appsController.show(anchor: self.statusBar.anchorFrame)
         }
         panelController.onVisibilityChange = { [weak self] visible in
-            self?.statusBar.setPanelOpen(visible)
+            self?.statusBar.setPanelOpen(visible, for: visible ? .clipboard : nil)
         }
 
         let model = panelController.model
@@ -230,22 +241,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                         if let view = self.panelController.panelContentView {
                             self.snapshot(view, to: "/tmp/shot-panel.png")
                         }
-                        self.statusBar.setDebugHover(true)
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                            let appearance = self.statusBar.statusView.effectiveAppearance
-                            let style = appearance.bestMatch(from: [.darkAqua, .aqua])
-                            self.statusBar.setDebugBackground(style == .darkAqua ? .black : .white)
+                        let appearance = self.statusBar.statusView.effectiveAppearance
+                        let style = appearance.bestMatch(from: [.darkAqua, .aqua])
+                        let bg: NSColor = (style == .darkAqua ? .black : .white)
+
+                        // 1. 无悬停时的状态栏（剪贴板激活高亮）
+                        self.snapshot(self.statusBar.statusView, to: "/tmp/shot-bar-transparent.png")
+                        self.statusBar.setDebugBackground(bg)
+                        self.snapshot(self.statusBar.statusView, to: "/tmp/shot-bar.png")
+                        self.statusBar.setDebugBackground(nil)
+
+                        // 2. 鼠标悬停在 CPU 分段时的状态栏（仅 CPU 高亮，剪贴板保持激活）
+                        self.statusBar.setDebugHover(true, index: 0)
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            self.statusBar.setDebugBackground(bg)
                             self.snapshot(self.statusBar.statusView, to: "/tmp/shot-bar-hover.png")
                             self.statusBar.setDebugBackground(nil)
                             self.statusBar.setDebugHover(false)
                         }
-                        self.snapshot(self.statusBar.statusView, to: "/tmp/shot-bar-transparent.png")
-                        let viewAppearance = self.statusBar.statusView.effectiveAppearance
-                        let style = viewAppearance.bestMatch(from: [.darkAqua, .aqua])
-                        NSLog("%@", "DIAG appearance app=\(NSApp.effectiveAppearance.name.rawValue) view=\(viewAppearance.name.rawValue) style=\(style == .darkAqua ? "dark" : "light")")
-                        self.statusBar.setDebugBackground(style == .darkAqua ? .black : .white)
-                        self.snapshot(self.statusBar.statusView, to: "/tmp/shot-bar.png")
-                        self.statusBar.setDebugBackground(nil)
+
+                        NSLog("%@", "DIAG appearance app=\(NSApp.effectiveAppearance.name.rawValue) view=\(appearance.name.rawValue) style=\(style == .darkAqua ? "dark" : "light")")
                         self.openSettingsWindow()
                         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
                             if let view = self.settingsWindow?.window?.contentView {
@@ -429,6 +444,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case .memory: return .memory
         case .network: return .network
         default: return .cpu        // CPU / 温度 / 空白区域
+        }
+    }
+
+    private static func segmentKind(for mode: MetricMode) -> SegmentKind {
+        switch mode {
+        case .cpu: return .cpu
+        case .gpu: return .gpu
+        case .memory: return .memory
+        case .network: return .network
         }
     }
 

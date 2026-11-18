@@ -14,12 +14,16 @@ struct StatusSegment {
     let label: Label
     let lines: [String]
     let templates: [String]
+    /// 给数值加一个圆角徽章底（剪贴板只显示数字且没有单位时用）
+    let badge: Bool
 
-    init(kind: SegmentKind? = nil, label: Label, lines: [String], templates: [String]) {
+    init(kind: SegmentKind? = nil, label: Label, lines: [String],
+         templates: [String], badge: Bool = false) {
         self.kind = kind
         self.label = label
         self.lines = lines
         self.templates = templates
+        self.badge = badge
     }
 }
 
@@ -50,10 +54,43 @@ private final class StatusContentView: NSView {
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
 }
 
-/// 每个分段一个透明命中视图：由 AppKit 负责命中测试，避免自己算坐标。
+/// 每个分段一个透明命中视图：由 AppKit 负责命中测试与鼠标悬停跟踪
 private final class SegmentHitView: NSView {
+    var index: Int = 0
     var kind: SegmentKind?
     var onMouseDown: ((NSEvent) -> Void)?
+    var onHoverChanged: ((Bool) -> Void)?
+
+    private var trackingAreaRef: NSTrackingArea?
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let trackingAreaRef {
+            removeTrackingArea(trackingAreaRef)
+        }
+        let area = NSTrackingArea(
+            rect: bounds,
+            options: [.activeAlways, .mouseEnteredAndExited, .inVisibleRect],
+            owner: self,
+            userInfo: nil
+        )
+        addTrackingArea(area)
+        trackingAreaRef = area
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        if let window = self.window {
+            let screenPoint = NSEvent.mouseLocation
+            let windowPoint = window.convertPoint(fromScreen: screenPoint)
+            let viewPoint = convert(windowPoint, from: nil)
+            guard bounds.contains(viewPoint) else { return }
+        }
+        onHoverChanged?(true)
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        onHoverChanged?(false)
+    }
 
     override func mouseDown(with event: NSEvent) { onMouseDown?(event) }
     override func rightMouseDown(with event: NSEvent) { onMouseDown?(event) }
@@ -79,6 +116,15 @@ final class StatusItemView: NSView {
         }
     }
 
+    /// 当前处于激活弹出状态的分段（如点击 CPU 打开 CPU 详情面板时，高亮 CPU 分段）
+    var activeSegmentKind: SegmentKind? {
+        didSet {
+            if oldValue != activeSegmentKind {
+                contentView.needsDisplay = true
+            }
+        }
+    }
+
     /// 点击某个模块时回调；nil 表示点在空白 / 内外边距区域
     var onSegmentClick: ((SegmentKind?) -> Void)?
     var onRightClick: ((NSEvent) -> Void)?
@@ -86,12 +132,19 @@ final class StatusItemView: NSView {
     /// 仅用于离屏截图自检
     var debugBackgroundColor: NSColor?
     var debugHover = false { didSet { contentView.needsDisplay = true } }
+    var debugHoverIndex: Int? { didSet { contentView.needsDisplay = true } }
 
     weak var statusItem: NSStatusItem?
 
     private let contentView = StatusContentView()
     private var effectView: PassthroughEffectView?
-    private var isHovered = false
+    private var hoveredIndex: Int? {
+        didSet {
+            if oldValue != hoveredIndex {
+                contentView.needsDisplay = true
+            }
+        }
+    }
     private var trackingAreaRef: NSTrackingArea?
     private var cachedLayout: [SegmentLayout] = []
     private var hitViews: [SegmentHitView] = []
@@ -99,12 +152,28 @@ final class StatusItemView: NSView {
     private struct SegmentLayout {
         let kind: SegmentKind?
         let label: StatusSegment.Label
-        let labelWidth: CGFloat
+        let badge: Bool
+        let rawLabelWidth: CGFloat
+        let labelValueGap: CGFloat
+        let actualValueWidth: CGFloat
+        let valueSlot: CGFloat
         let lines: [String]
         let lineWidths: [CGFloat]
-        let textPart: CGFloat
         let font: NSFont
-        var slot: CGFloat { labelWidth + textPart }
+
+        static let labelValueGapStandard: CGFloat = 2.5
+
+        var actualContentWidth: CGFloat {
+            rawLabelWidth + labelValueGap + actualValueWidth
+        }
+
+        var contentSlot: CGFloat {
+            rawLabelWidth + labelValueGap + valueSlot
+        }
+
+        var totalWidth: CGFloat {
+            contentSlot
+        }
     }
 
     // MARK: - 初始化
@@ -164,17 +233,33 @@ final class StatusItemView: NSView {
 
     // MARK: - 布局
 
+    private static let badgeIconWidth: CGFloat = 9.0
+    private static let badgeIconHeight: CGFloat = 10.0
+    private static let badgePadLeft: CGFloat = 5.0
+    private static let badgePadRight: CGFloat = 5.5
+    private static let badgeIconTextGap: CGFloat = 3.0
+
+    private var badgeFont: NSFont {
+        .monospacedDigitSystemFont(ofSize: 10.0, weight: .semibold)
+    }
+
+    private func badgeWidth(for text: String) -> CGFloat {
+        guard !text.isEmpty else { return 0 }
+        let textWidth = ceil((text as NSString).size(withAttributes: [.font: badgeFont]).width)
+        return Self.badgePadLeft + Self.badgeIconWidth + Self.badgeIconTextGap + textWidth + Self.badgePadRight
+    }
+
     private func width(_ text: String, font: NSFont) -> CGFloat {
         guard !text.isEmpty else { return 0 }
         return ceil((text as NSString).size(withAttributes: [.font: font]).width)
     }
 
-    private func labelWidth(_ label: StatusSegment.Label) -> CGFloat {
+    private func rawLabelWidth(_ label: StatusSegment.Label) -> CGFloat {
         switch label {
         case .symbol:
-            return iconSide + 3
+            return iconSide
         case .text(let text):
-            return width(text, font: style.font) + 4
+            return width(text, font: style.font)
         case .none:
             return 0
         }
@@ -183,28 +268,63 @@ final class StatusItemView: NSView {
     private func layout(_ segments: [StatusSegment]) -> [SegmentLayout] {
         segments.map { segment in
             let font = segment.lines.count > 1 ? verticalFont : style.font
-            let lineWidths = segment.lines.map { width($0, font: font) }
-            let templateWidths = segment.templates.map { width($0, font: font) }
-            let textPart = max(lineWidths.max() ?? 0, templateWidths.max() ?? 0)
-            return SegmentLayout(
-                kind: segment.kind,
-                label: segment.label,
-                labelWidth: labelWidth(segment.label),
-                lines: segment.lines,
-                lineWidths: lineWidths,
-                textPart: textPart,
-                font: font
-            )
+            let rawLabel = rawLabelWidth(segment.label)
+            let hasLabel: Bool
+            switch segment.label {
+            case .none: hasLabel = false
+            default: hasLabel = true
+            }
+            let hasValue = !segment.lines.isEmpty
+            let gap = (hasLabel && hasValue) ? SegmentLayout.labelValueGapStandard : 0.0
+
+            if segment.badge {
+                let countText = segment.lines.first ?? "0"
+                let actualVal = badgeWidth(for: countText)
+                let templateText = segment.templates.first ?? countText
+                let templateVal = badgeWidth(for: templateText)
+                let valueSlot = max(actualVal, templateVal)
+                return SegmentLayout(
+                    kind: segment.kind,
+                    label: segment.label,
+                    badge: true,
+                    rawLabelWidth: rawLabel,
+                    labelValueGap: gap,
+                    actualValueWidth: actualVal,
+                    valueSlot: valueSlot,
+                    lines: segment.lines,
+                    lineWidths: [actualVal],
+                    font: badgeFont
+                )
+            } else {
+                let lineWidths = segment.lines.map { width($0, font: font) }
+                let templateWidths = segment.templates.map { width($0, font: font) }
+                let actualVal = lineWidths.max() ?? 0
+                let templateVal = templateWidths.max() ?? 0
+                let valueSlot = max(actualVal, templateVal)
+                return SegmentLayout(
+                    kind: segment.kind,
+                    label: segment.label,
+                    badge: false,
+                    rawLabelWidth: rawLabel,
+                    labelValueGap: gap,
+                    actualValueWidth: actualVal,
+                    valueSlot: valueSlot,
+                    lines: segment.lines,
+                    lineWidths: lineWidths,
+                    font: font
+                )
+            }
         }
     }
 
     private func totalWidth(of items: [SegmentLayout]) -> CGFloat {
-        var total = style.padding * 2
+        var contentTotal: CGFloat = 0
         for (index, item) in items.enumerated() {
-            if index > 0 { total += style.spacing }
-            total += item.slot
+            if index > 0 { contentTotal += style.spacing }
+            contentTotal += item.totalWidth
         }
-        return ceil(max(22, total))
+        let total = contentTotal + style.padding * 2
+        return ceil(max(20, total))
     }
 
     /// 自检：直接用 AppKit 做命中测试，验证点击会落到哪个分段
@@ -227,13 +347,17 @@ final class StatusItemView: NSView {
 
     /// 自检：返回每个分段对应的点击区间
     func debugSegmentRects() -> [(String, NSRect)] {
-        var x = style.padding
+        let contentTotal = cachedLayout.enumerated().reduce(CGFloat(0)) { sum, elem in
+            sum + elem.element.totalWidth + (elem.offset > 0 ? style.spacing : 0)
+        }
+        let startX: CGFloat = (style.padding < 0) ? max(0, (bounds.width - contentTotal) / 2) : max(0, style.padding)
+        var x = startX
         var result: [(String, NSRect)] = []
         for (index, item) in cachedLayout.enumerated() {
             if index > 0 { x += style.spacing }
             result.append((item.kind?.rawValue ?? "nil",
-                           NSRect(x: x, y: 0, width: item.slot, height: bounds.height)))
-            x += item.slot
+                           NSRect(x: x, y: 0, width: item.totalWidth, height: bounds.height)))
+            x += item.totalWidth
         }
         return result
     }
@@ -258,23 +382,46 @@ final class StatusItemView: NSView {
         needsDisplay = true
     }
 
-    /// 为每个分段铺设透明命中视图（AppKit 命中测试，不依赖事件坐标）
+    /// 为每个分段铺设透明命中视图（包含分段本身与中间留白，避免点击盲区）
     private func rebuildHitAreas() {
         hitViews.forEach { $0.removeFromSuperview() }
         hitViews.removeAll()
 
-        var x = style.padding
+        let contentTotal = cachedLayout.enumerated().reduce(CGFloat(0)) { sum, elem in
+            sum + elem.element.totalWidth + (elem.offset > 0 ? style.spacing : 0)
+        }
+        let startX: CGFloat = (style.padding < 0) ? max(0, (bounds.width - contentTotal) / 2) : max(0, style.padding)
+        var x = startX
+
         for (index, item) in cachedLayout.enumerated() {
-            if index > 0 { x += style.spacing }
-            let frame = NSRect(x: x, y: 0, width: max(1, item.slot), height: bounds.height)
-            let hitView = SegmentHitView(frame: frame)
+            let leftBoundary = (index == 0) ? 0 : (x - style.spacing / 2)
+            let rightBoundary = (index == cachedLayout.count - 1)
+                ? bounds.width
+                : (x + item.totalWidth + style.spacing / 2)
+            let hitFrame = NSRect(
+                x: max(0, leftBoundary),
+                y: 0,
+                width: max(1, rightBoundary - leftBoundary),
+                height: bounds.height
+            )
+
+            let hitView = SegmentHitView(frame: hitFrame)
+            hitView.index = index
             hitView.kind = item.kind
             hitView.onMouseDown = { [weak self] event in
                 self?.handleSegmentMouseDown(kind: item.kind, event: event)
             }
+            hitView.onHoverChanged = { [weak self] hovered in
+                guard let self else { return }
+                if hovered {
+                    self.hoveredIndex = index
+                } else if self.hoveredIndex == index {
+                    self.hoveredIndex = nil
+                }
+            }
             addSubview(hitView)
             hitViews.append(hitView)
-            x += item.slot
+            x += item.totalWidth + style.spacing
         }
     }
 
@@ -283,8 +430,6 @@ final class StatusItemView: NSView {
             onRightClick?(event)
             return
         }
-        // 状态栏窗口里事件自带坐标并不可靠（实测恒为视图中心），
-        // 这里以真实光标位置为准重新判定一次。
         let resolved = kindFromCursor() ?? kind
         recordClick(event: event, kind: resolved)
         onSegmentClick?(resolved)
@@ -306,12 +451,6 @@ final class StatusItemView: NSView {
 
     private func backgroundRect() -> NSRect {
         bounds.insetBy(dx: 1, dy: 2)
-    }
-
-    /// 悬停高亮区域：水平内缩不超过内容留白，避免把两端文字切到高亮之外
-    private func hoverRect() -> NSRect {
-        let horizontalInset = min(2, style.padding)
-        return bounds.insetBy(dx: horizontalInset, dy: 3)
     }
 
     // MARK: - 绘制
@@ -349,63 +488,198 @@ final class StatusItemView: NSView {
     }
 
     private func drawContent() {
-        if isHovered || isPanelOpen || debugHover {
-            // 悬停高亮用固定的圆角矩形：不复用背景的 cornerRadius，
-            // 否则半径接近高度一半时会退化成椭圆，把两端文字裁掉
-            let rect = hoverRect()
-            let radius = min(6, rect.height / 2)
-            let path = NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius)
-            NSColor.labelColor.withAlphaComponent(isPanelOpen ? 0.20 : 0.11).setFill()
-            path.fill()
-            NSColor.labelColor.withAlphaComponent(isPanelOpen ? 0.26 : 0.15).setStroke()
-            path.lineWidth = 0.8
-            path.stroke()
-        }
-
         if cachedLayout.count != segments.count {
             cachedLayout = layout(segments)
         }
 
-        var x = style.padding
+        let contentTotal = cachedLayout.enumerated().reduce(CGFloat(0)) { sum, elem in
+            sum + elem.element.totalWidth + (elem.offset > 0 ? style.spacing : 0)
+        }
+        let startX: CGFloat = (style.padding < 0) ? max(0, (bounds.width - contentTotal) / 2) : max(0, style.padding)
+        var x = startX
 
         for (index, item) in cachedLayout.enumerated() {
             if index > 0 { x += style.spacing }
 
+            let isActive = isPanelOpen && (item.kind != nil && item.kind == activeSegmentKind)
+            let isHovered = (hoveredIndex == index) || (debugHover && (debugHoverIndex == nil ? index == 0 : debugHoverIndex == index))
+
+            // 1. 悬停 / 激活时仅高亮当前分段（胶囊左右各微展 1.5pt，呈现精致按钮质感）
+            if (isActive || isHovered) && !item.badge {
+                let pillRect = NSRect(x: x - 1.5, y: 2.5, width: item.totalWidth + 3.0, height: bounds.height - 5)
+                drawSegmentHighlight(in: pillRect, isActive: isActive, isHovered: isHovered)
+            }
+
+            var currentX = x
+
+            // 2. 绘制标签
             switch item.label {
             case .symbol(let name):
-                drawSymbol(name, at: NSPoint(x: x, y: (bounds.height - iconSide) / 2))
-                x += iconSide + 3
+                drawSymbol(name, at: NSPoint(x: currentX, y: (bounds.height - iconSide) / 2))
+                currentX += item.rawLabelWidth + item.labelValueGap
             case .text(let text):
                 let attrs = attributes(style.font)
                 let size = (text as NSString).size(withAttributes: attrs)
-                (text as NSString).draw(at: NSPoint(x: x, y: (bounds.height - size.height) / 2),
-                                        withAttributes: attrs)
-                x += size.width + 4
+                (text as NSString).draw(
+                    at: NSPoint(x: currentX, y: (bounds.height - size.height) / 2),
+                    withAttributes: attrs
+                )
+                currentX += item.rawLabelWidth + item.labelValueGap
             case .none:
                 break
             }
 
+            // 3. 绘制数值或剪贴板徽章
             if !item.lines.isEmpty {
-                drawLines(item, at: x)
-                x += item.textPart
+                if item.badge {
+                    let countText = item.lines.first ?? "0"
+                    let leftover = max(0, item.valueSlot - item.actualValueWidth)
+                    let badgeOffset = (style.alignment == .center) ? leftover / 2 : (style.alignment == .trailing ? leftover : 0)
+                    let badgeRect = NSRect(
+                        x: currentX + badgeOffset,
+                        y: (bounds.height - 15.0) / 2,
+                        width: item.actualValueWidth,
+                        height: 15.0
+                    )
+                    drawBadge(
+                        text: countText,
+                        rect: badgeRect,
+                        isHovered: isHovered,
+                        isActive: isActive
+                    )
+                } else {
+                    drawLines(item, at: currentX)
+                }
             }
+
+            x += item.totalWidth
         }
+    }
+
+    /// 独立分段高亮背景胶囊（悬停时淡亮、激活打开面板时主色强调）
+    private func drawSegmentHighlight(in rect: NSRect, isActive: Bool, isHovered: Bool) {
+        let radius: CGFloat = 5.0
+        let path = NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius)
+        if isActive {
+            let start = NSColor.controlAccentColor.withAlphaComponent(0.28)
+            let end = NSColor.controlAccentColor.withAlphaComponent(0.16)
+            if let grad = NSGradient(starting: start, ending: end) {
+                grad.draw(in: path, angle: -90)
+            } else {
+                start.setFill()
+                path.fill()
+            }
+            NSColor.white.withAlphaComponent(0.32).setStroke()
+            path.lineWidth = 0.75
+            path.stroke()
+        } else if isHovered {
+            let start = NSColor.labelColor.withAlphaComponent(0.14)
+            let end = NSColor.labelColor.withAlphaComponent(0.08)
+            if let grad = NSGradient(starting: start, ending: end) {
+                grad.draw(in: path, angle: -90)
+            } else {
+                start.setFill()
+                path.fill()
+            }
+            NSColor.labelColor.withAlphaComponent(0.12).setStroke()
+            path.lineWidth = 0.5
+            path.stroke()
+        }
+    }
+
+    /// 剪贴板液态玻璃微型徽章（带 doc.on.clipboard 图标语义 + 等宽紧凑数字）
+    private func drawBadge(
+        text: String,
+        rect: NSRect,
+        isHovered: Bool,
+        isActive: Bool
+    ) {
+        let radius = rect.height / 2
+        let path = NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius)
+
+        // 1. 胶囊背景：半透明强调色渐变
+        let topAlpha: CGFloat = (isActive || isHovered) ? 0.36 : 0.22
+        let bottomAlpha: CGFloat = (isActive || isHovered) ? 0.20 : 0.10
+        let topColor = NSColor.controlAccentColor.withAlphaComponent(topAlpha)
+        let bottomColor = NSColor.controlAccentColor.withAlphaComponent(bottomAlpha)
+
+        if let gradient = NSGradient(starting: topColor, ending: bottomColor) {
+            gradient.draw(in: path, angle: -90)
+        } else {
+            topColor.setFill()
+            path.fill()
+        }
+
+        // 2. 边缘微光高光边框
+        let strokeAlpha: CGFloat = (isActive || isHovered) ? 0.45 : 0.28
+        NSColor.white.withAlphaComponent(strokeAlpha).setStroke()
+        path.lineWidth = 0.65
+        path.stroke()
+
+        // 3. 微图标：doc.on.clipboard（赋予数字明确语义）
+        let iconW = Self.badgeIconWidth
+        let iconH = Self.badgeIconHeight
+        if let base = NSImage(systemSymbolName: "doc.on.clipboard", accessibilityDescription: "剪贴板") {
+            let config = NSImage.SymbolConfiguration(pointSize: 8.5, weight: .medium)
+            let icon = base.withSymbolConfiguration(config) ?? base
+            let tinted = NSImage(size: NSSize(width: iconW, height: iconH))
+            tinted.lockFocus()
+            icon.draw(in: NSRect(origin: .zero, size: NSSize(width: iconW, height: iconH)))
+            (style.textColor ?? NSColor.labelColor).set()
+            NSRect(origin: .zero, size: NSSize(width: iconW, height: iconH)).fill(using: .sourceAtop)
+            tinted.unlockFocus()
+
+            let iconY = rect.minY + (rect.height - iconH) / 2
+            tinted.draw(
+                in: NSRect(x: rect.minX + Self.badgePadLeft, y: iconY, width: iconW, height: iconH),
+                from: .zero,
+                operation: .sourceOver,
+                fraction: 1.0,
+                respectFlipped: false,
+                hints: nil
+            )
+        }
+
+        // 4. 数字排版
+        let font = badgeFont
+        let attrs: [NSAttributedString.Key: Any] = [
+            .font: font,
+            .foregroundColor: style.textColor ?? NSColor.labelColor
+        ]
+        let textSize = (text as NSString).size(withAttributes: attrs)
+        let textX = rect.minX + Self.badgePadLeft + Self.badgeIconWidth + Self.badgeIconTextGap
+        let textY = rect.minY + (rect.height - textSize.height) / 2
+        (text as NSString).draw(at: NSPoint(x: textX, y: textY), withAttributes: attrs)
     }
 
     private func drawLines(_ item: SegmentLayout, at x: CGFloat) {
         let attrs = attributes(item.font)
 
+        let hasLabel: Bool
+        switch item.label {
+        case .none: hasLabel = false
+        default: hasLabel = true
+        }
+
         if item.lines.count == 1 {
             let text = item.lines[0]
             let size = (text as NSString).size(withAttributes: attrs)
-            let leftover = max(0, item.textPart - item.lineWidths[0])
+            // 当有前置标签（如 CPU、GPU、内存）时，数值紧跟标签，偏移恒为 0，确保数值始终跟随名称；
+            // 仅在无标签独立显示数值时，才在预留槽位内部居中 / 靠右对齐。
             let offset: CGFloat
-            switch style.alignment {
-            case .center: offset = leftover / 2
-            case .trailing: offset = leftover
+            if hasLabel {
+                offset = 0
+            } else {
+                let leftover = max(0, item.valueSlot - item.lineWidths[0])
+                switch style.alignment {
+                case .center: offset = leftover / 2
+                case .trailing: offset = leftover
+                }
             }
-            (text as NSString).draw(at: NSPoint(x: x + offset, y: (bounds.height - size.height) / 2),
-                                    withAttributes: attrs)
+            (text as NSString).draw(
+                at: NSPoint(x: x + offset, y: (bounds.height - size.height) / 2),
+                withAttributes: attrs
+            )
             return
         }
 
@@ -417,11 +691,15 @@ final class StatusItemView: NSView {
 
         for (lineIndex, text) in item.lines.enumerated() {
             let size = (text as NSString).size(withAttributes: attrs)
-            let leftover = max(0, item.textPart - (item.lineWidths[safe: lineIndex] ?? size.width))
             let offset: CGFloat
-            switch style.alignment {
-            case .center: offset = leftover / 2
-            case .trailing: offset = leftover
+            if hasLabel {
+                offset = 0
+            } else {
+                let leftover = max(0, item.valueSlot - (item.lineWidths[safe: lineIndex] ?? size.width))
+                switch style.alignment {
+                case .center: offset = leftover / 2
+                case .trailing: offset = leftover
+                }
             }
             let y = startY + CGFloat(item.lines.count - 1 - lineIndex) * lineHeight
             (text as NSString).draw(
@@ -466,12 +744,11 @@ final class StatusItemView: NSView {
     }
 
     override func mouseEntered(with event: NSEvent) {
-        isHovered = true
-        contentView.needsDisplay = true
+        // 由各分段的 SegmentHitView 独立跟踪悬停
     }
 
     override func mouseExited(with event: NSEvent) {
-        isHovered = false
+        hoveredIndex = nil
         contentView.needsDisplay = true
     }
 
@@ -497,27 +774,37 @@ final class StatusItemView: NSView {
         return screenPoint.x - viewInScreen.minX
     }
 
-    /// 命中测试：菜单栏是一维的，只比较横向位置。
-    /// 纵向不参与判断（状态栏窗口比视图高，点击可能落在视图上下边界之外）。
-    private func segmentKind(atX rawX: CGFloat) -> SegmentKind? {
+    private func segmentIndex(atX rawX: CGFloat) -> Int? {
         guard !cachedLayout.isEmpty else { return nil }
-
         let clamped = min(max(rawX, 0), bounds.width)
-        var x = style.padding
+        let contentTotal = cachedLayout.enumerated().reduce(CGFloat(0)) { sum, elem in
+            sum + elem.element.totalWidth + (elem.offset > 0 ? style.spacing : 0)
+        }
+        let startX: CGFloat = (style.padding < 0) ? max(0, (bounds.width - contentTotal) / 2) : max(0, style.padding)
+        var x = startX
 
         for (index, item) in cachedLayout.enumerated() {
-            if index > 0 { x += style.spacing }
-            let maxX = x + item.slot
-            if clamped >= x && clamped < maxX {
-                return item.kind
+            let leftBoundary = (index == 0) ? 0 : (x - style.spacing / 2)
+            let rightBoundary = (index == cachedLayout.count - 1)
+                ? bounds.width
+                : (x + item.totalWidth + style.spacing / 2)
+            if clamped >= leftBoundary && clamped < rightBoundary {
+                return index
             }
-            x = maxX
+            x += item.totalWidth + style.spacing
         }
-
-        // 落在左右边缘留白里，归为最近的一段
-        if clamped >= x { return cachedLayout.last?.kind }
-        if clamped < style.padding { return cachedLayout.first?.kind }
         return nil
+    }
+
+    /// 命中测试：菜单栏是一维的，只比较横向位置
+    private func segmentKind(atX rawX: CGFloat) -> SegmentKind? {
+        guard !cachedLayout.isEmpty else { return nil }
+        if let idx = segmentIndex(atX: rawX) {
+            return cachedLayout[idx].kind
+        }
+        let clamped = min(max(rawX, 0), bounds.width)
+        if clamped >= bounds.width / 2 { return cachedLayout.last?.kind }
+        return cachedLayout.first?.kind
     }
 
     /// 临时诊断：把每次点击的坐标与命中结果写入 /tmp/clipstats-clicks.log
@@ -599,16 +886,22 @@ final class StatusBarController {
         view.needsDisplay = true
     }
 
-    func setDebugHover(_ hovering: Bool) {
+    func setDebugHover(_ hovering: Bool, index: Int? = nil) {
         view.debugHover = hovering
+        view.debugHoverIndex = index
     }
 
     var anchorFrame: NSRect {
         view.window?.frame ?? NSRect(x: 0, y: NSScreen.main?.frame.maxY ?? 900, width: 200, height: 24)
     }
 
-    func setPanelOpen(_ open: Bool) {
+    func setPanelOpen(_ open: Bool, for kind: SegmentKind? = nil) {
         view.isPanelOpen = open
+        view.activeSegmentKind = open ? kind : nil
+    }
+
+    func setActiveSegment(_ kind: SegmentKind?) {
+        view.activeSegmentKind = kind
     }
 
     func update(_ snapshot: MetricsSnapshot) {
@@ -665,11 +958,15 @@ final class StatusBarController {
             if config.showText {
                 lines = valueLines(for: config.kind, snapshot: snapshot, count: count, settings: settings)
                 if settings.stabilizeBarWidth {
-                    templates = templateLines(for: config.kind, settings: settings)
+                    templates = templateLines(for: config.kind, count: count, settings: settings)
                 }
             }
 
-            segments.append(StatusSegment(kind: config.kind, label: label, lines: lines, templates: templates))
+            let needsBadge = config.kind == .clipboard
+                && config.labelMode == .none
+                && config.showText
+            segments.append(StatusSegment(kind: config.kind, label: label, lines: lines,
+                                          templates: templates, badge: needsBadge))
         }
 
         if segments.isEmpty {
@@ -684,22 +981,28 @@ final class StatusBarController {
         return view.measuredWidth(for: segments)
     }
 
-    private func templateLines(for kind: SegmentKind, settings: AppSettings) -> [String] {
+    private func templateLines(for kind: SegmentKind, count: Int, settings: AppSettings) -> [String] {
         switch kind {
         case .cpu:
-            return [settings.showCPUWithTemperature ? "100% 100°" : "100%"]
+            return [settings.showCPUWithTemperature ? "99% 99°" : "99%"]
         case .gpu:
-            return ["100%"]
+            return ["99%"]
         case .memory:
-            return ["100%"]
+            return ["99%"]
         case .thermal:
-            return ["100°"]
+            return ["99°"]
         case .network:
             // Fmt.speed 最长输出形如 "84.0K" / "1.15M"（5 个字符），预留同宽
             // 上下排列时上传在上、下载在下
             return settings.networkVertical ? ["↑9.99M", "↓9.99M"] : ["↓9.99M ↑9.99M"]
         case .clipboard:
-            return ["999"]
+            if count < 10 {
+                return ["9"]
+            } else if count < 100 {
+                return ["99"]
+            } else {
+                return ["999"]
+            }
         }
     }
 

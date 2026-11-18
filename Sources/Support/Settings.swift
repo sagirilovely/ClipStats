@@ -191,8 +191,8 @@ struct BarAppearance: Codable {
     }
 
     mutating func normalize() {
-        segmentSpacing = min(max(segmentSpacing, 0), 20)
-        horizontalPadding = min(max(horizontalPadding, 0), 20)
+        segmentSpacing = min(max(segmentSpacing, -10), 24)
+        horizontalPadding = min(max(horizontalPadding, -10), 24)
         iconPointSize = min(max(iconPointSize, 8), 18)
         backgroundOpacity = min(max(backgroundOpacity, 0.05), 1)
         cornerRadius = min(max(cornerRadius, 0), 14)

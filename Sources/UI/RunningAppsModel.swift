@@ -68,6 +68,7 @@ final class RunningAppsModel: ObservableObject {
                 networkMonitor.stop()
             }
             reload()
+            onModeChange?(mode)
         }
     }
     @Published var hoveredPID: pid_t?
@@ -77,6 +78,7 @@ final class RunningAppsModel: ObservableObject {
     /// 由 AppDelegate 注入
     var onOpenSettings: (() -> Void)?
     var onSwitchToClipboard: (() -> Void)?
+    var onModeChange: ((MetricMode) -> Void)?
 
     private let sampler = ProcessSampler()
     private let networkMonitor = NetworkProcessMonitor()
