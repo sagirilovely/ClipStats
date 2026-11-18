@@ -24,6 +24,15 @@ enum ProcessIdentity {
         let rid = function(pid)
         return rid > 0 ? rid : pid
     }
+
+    /// 进程启动时间（秒）。用来识别 pid 复用，避免把新进程的累计值当成旧进程的增量
+    static func startTime(_ pid: pid_t) -> UInt64 {
+        var info = proc_bsdinfo()
+        let size = MemoryLayout<proc_bsdinfo>.stride
+        let result = proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, &info, Int32(size))
+        guard result == Int32(size) else { return 0 }
+        return UInt64(info.pbi_start_tvsec)
+    }
 }
 
 struct ProcessSample: Identifiable {

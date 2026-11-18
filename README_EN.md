@@ -60,7 +60,7 @@ Mac power users and developers often struggle with two notorious menu bar issues
 | **Accessibility Permission (AX)** | **❌ Zero Permissions Needed** | ❌ None | ⚠️ Required | ⚠️ Required | ⚠️ Required |
 | **Resident Memory (RAM)** | **~18–25 MB** | ~60–120 MB | ~30–50 MB | ~100–250 MB | ~80–180 MB |
 | **Apple Silicon SMC Thermals** | **✅ Dynamic Runtime Key Probing** | ✅ Supported | — | ✅ Supported | — |
-| **Process Inspector & Killing** | **✅ Live Top 5 CPU/GPU/RAM/Net** | ✅ Supported | — | ✅ Supported | — |
+| **Process Inspector & Killing** | **✅ Live CPU/GPU/RAM/Net ranking + release** | ✅ Supported | — | ✅ Supported | — |
 | **Vertical Dual-Row Net Speed** | **✅ Supported (50% Space Saved)** | ✅ Supported | — | ✅ Supported | — |
 | **Xcode-Free CLI Build** | **✅ Instant (Makefile + swiftc)** | ⚠️ Requires Xcode | ⚠️ Requires Xcode | ❌ Proprietary | ❌ Proprietary |
 | **Open Source & Free** | **✅ 100% MIT, Zero Telemetry** | ✅ MIT License | ✅ MIT License | ❌ Paid Subscription | ❌ Paid Subscription |
@@ -87,13 +87,16 @@ Mac power users and developers often struggle with two notorious menu bar issues
 - **Independent Segment Hover & Active State**: Moving your cursor across metrics triggers an isolated soft liquid glow on that specific metric segment.
 - **Categorized Running Apps Panel**:
   - Clicking CPU, GPU, Memory, or Network opens the dedicated Running Apps inspector.
-  - Live **Top 5 most demanding applications & background processes**.
-  - Displays high-resolution app icons, executable process names, and instantaneous resource loads.
-  - Integrated **one-click process termination (Kill)** to terminate frozen or runaway tasks immediately.
+  - Lists **every regular (Dock) application**, ranked by the active metric (CPU / GPU / Network / Memory); system daemons stay out of the list.
+  - Displays high-resolution app icons, process names, uptime, and instantaneous load; Electron and browser helper processes are merged back into their owning app.
+  - **CPU card** includes a per-core bar chart with a 100% / 50% / 0 axis; **GPU card** splits unified memory into "GPU VRAM used / other memory used / free" as a two-tone stacked bar, so it never reads as "VRAM is nearly empty".
+  - Network mode attributes per-process up/down traffic (from the system `nettop`; proxied traffic is credited to the proxy process).
+  - **Release (graceful quit)** button per app, with a confirmation-gated force quit as fallback, so nothing is SIGKILLed by accident.
 
 ### 3. 📋 Privacy-First Native Clipboard History
 - **Multi-Type Native Capture**: Instantly records plain text, rich formatted text (RTF/HTML), raster images (PNG/JPEG/TIFF), and file path references.
 - **Sub-Millisecond Search & Filter**: Real-time keyword filtering with dedicated tabs for `All`, `Text`, `Images`, and `Files`. Full keyboard navigation (`↑`/`↓` and `Enter`).
+- **Hover Preview**: Rest for 0.35 s and a non-focusing overlay pops out beside the panel — full-size image, text excerpt, or a file list with the first lines of text files — so you never have to click (and overwrite the clipboard) just to see what an entry is.
 - **One-Click Pinning & Smart Deduplication**: Pin frequently used snippets to stay at the top. Duplicate copies refresh existing item timestamps without bloating history.
 - **Automatic Password Concealment**: Automatically ignores transient pasteboard items carrying `org.nspasteboard.ConcealedType` and markers from 1Password, Bitwarden, KeepassXC, and system Keychain.
 - **Zero Accessibility Permissions**: Registered through macOS Carbon `RegisterEventHotKey` (default `⌥⌘V`), ensuring zero keylogging security exposure.
@@ -125,7 +128,12 @@ Mac power users and developers often struggle with two notorious menu bar issues
 | Running Apps Inspector (Click any Metric) | Native Clipboard Panel (Default `⌥⌘V`) |
 | :---: | :---: |
 | <img src="docs/screenshots/running-apps.png" alt="Running Apps Panel" width="380" /> | <img src="docs/screenshots/clipboard-panel.png" alt="Clipboard History Panel" width="380" /> |
-| <sub>Live Top 5 ranking across CPU/GPU/RAM/Net with one-click Kill</sub> | <sub>Sub-millisecond search, media previews, pinning, and instant restore</sub> |
+| <sub>All regular apps ranked by the active metric; per-core chart with axis; VRAM used/total</sub> | <sub>Sub-millisecond search, media previews, pinning, and instant restore</sub> |
+
+| Hover Preview: Image | Hover Preview: Text | Hover Preview: Files |
+| :---: | :---: | :---: |
+| <img src="docs/screenshots/preview-image.png" alt="Image Hover Preview" width="300" /> | <img src="docs/screenshots/preview-text.png" alt="Text Hover Preview" width="300" /> | <img src="docs/screenshots/preview-files.png" alt="File Hover Preview" width="300" /> |
+| <sub>Scaled to 360pt with true pixel dimensions in the caption</sub> | <sub>Height measured with the real font; long text ends in an ellipsis</sub> | <sub>Text files show their first lines; binaries show metadata only</sub> |
 
 ---
 
@@ -291,6 +299,9 @@ CLIPSTATS_DIAG=1 CLIPSTATS_DIAG_SHOW=apps CLIPSTATS_DIAG_APPS_MODE=cpu ./build/C
 
 # 4. Use an isolated test database to protect production clipboard history
 CLIPSTATS_DATA_DIR=/tmp/clipstats-dev ./build/ClipStats.app/Contents/MacOS/ClipStats
+
+# 5. Exercise the real hover-preview pipeline (image / text / files)
+CLIPSTATS_DIAG=1 CLIPSTATS_DIAG_SHOW=preview CLIPSTATS_DIAG_PREVIEW_KIND=image ./build/ClipStats.app/Contents/MacOS/ClipStats
 ```
 
 ---

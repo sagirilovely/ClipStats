@@ -47,12 +47,26 @@ final class ClipboardPanelModel: ObservableObject {
         focusToken += 1
     }
 
+    /// 由 ClipboardPanelController 注入：悬停某一条时显示大图 / 文本预览（nil = 收起）
+    var onHoverPreview: ((ClipboardStore.Item?) -> Void)?
+
     func setHovered(_ id: Int64, _ hovered: Bool) {
         if hovered {
             hoveredID = id
+            if let item = items.first(where: { $0.id == id }) {
+                onHoverPreview?(item)
+            }
         } else if hoveredID == id {
             hoveredID = nil
+            onHoverPreview?(nil)
         }
+    }
+
+    /// 列表滚动 / 刷新时收起预览浮层。
+    /// 同时清掉悬停态：滚动后光标下的行可能已经换了，等真实的 onHover 重新建立
+    func dismissHoverPreview() {
+        hoveredID = nil
+        onHoverPreview?(nil)
     }
 
     var onRestore: ((ClipboardStore.Item) -> Void)?
@@ -89,6 +103,9 @@ final class ClipboardPanelModel: ObservableObject {
                 // 只保留当前列表里还存在的缩略图，避免缓存无限增长
                 let ids = Set(items.map(\.id))
                 self.thumbnailCache = self.thumbnailCache.filter { ids.contains($0.key) }
+                // 列表整体重排（新条目入库、置顶、删除）后，悬停行对应的已经是另一条内容，统一收起
+                self.hoveredID = nil
+                self.onHoverPreview?(nil)
             }
         }
     }

@@ -117,25 +117,13 @@ struct RunningAppsPanelView: View {
             }
 
             if let cores = model.metrics?.cpu.perCore, !cores.isEmpty {
-                HStack(alignment: .bottom, spacing: 3) {
-                    ForEach(cores.indices, id: \.self) { index in
-                        VStack(spacing: 0) {
-                            Spacer(minLength: 0)
-                            RoundedRectangle(cornerRadius: 1.5, style: .continuous)
-                                .fill(coreColor(cores[index]))
-                                .frame(height: max(2, 18 * CGFloat(min(1, cores[index]))))
-                        }
-                        .frame(maxWidth: .infinity)
-                    }
-                }
-                .frame(height: 18, alignment: .bottom)
-                .help("每个核心的占用")
+                coreChart(cores)
             }
 
             HStack(spacing: 12) {
                 detailPair("平均温度", model.metrics?.thermal.cpuTemperatureAverage.map { Fmt.temperature($0) } ?? "—")
                 detailPair("最高温度", model.metrics?.thermal.cpuTemperature.map { Fmt.temperature($0) } ?? "—")
-                detailPair("核心数", "\(model.metrics?.cpu.perCore.count ?? 0)")
+                detailPair("核心数", model.metrics.map { "\($0.cpu.perCore.count)" } ?? "—")
             }
         }
     }
@@ -154,11 +142,50 @@ struct RunningAppsPanelView: View {
             }
             HStack(spacing: 12) {
                 detailPair("渲染器", model.metrics?.gpu.rendererUtilization.map { Fmt.percent($0) } ?? "—")
-                detailPair("显存", model.metrics?.gpu.memoryUsed.map { Fmt.bytes($0) } ?? "—")
+                detailPair("GPU 内存 已用 / 总", gpuMemoryText)
             }
-            Text("GPU 每进程数据来自 IOAccelerator，仅统计提交了 GPU 工作的进程")
+
+            if let breakdown = gpuMemoryBreakdown {
+                // 双色堆叠：蓝色 = GPU 占用的显存，灰色 = 已被系统其它部分使用的内存，空槽 = 剩余
+                GeometryReader { proxy in
+                    let width = proxy.size.width
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(Color.primary.opacity(0.09))
+                        if breakdown.otherRatio > 0 {
+                            Rectangle()
+                                .fill(Color.primary.opacity(0.28))
+                                .frame(width: width * CGFloat(breakdown.otherRatio))
+                                .offset(x: width * CGFloat(breakdown.gpuRatio))
+                        }
+                        if breakdown.gpuRatio > 0 {
+                            Rectangle()
+                                .fill(Color.accentColor.opacity(0.85))
+                                .frame(width: max(2, width * CGFloat(breakdown.gpuRatio)))
+                        }
+                    }
+                    .clipShape(Capsule())
+                }
+                .frame(height: 6)
+                .accessibilityElement()
+                .accessibilityLabel(
+                    "GPU 占用 \(Fmt.compactBytes(breakdown.gpu))，其他已用 \(Fmt.compactBytes(breakdown.other))，剩余 \(Fmt.compactBytes(breakdown.free))"
+                )
+
+                HStack(spacing: 10) {
+                    legendDot(color: Color.accentColor.opacity(0.85), text: "GPU \(Fmt.compactBytes(breakdown.gpu))")
+                    legendDot(color: Color.primary.opacity(0.32), text: "其他已用 \(Fmt.compactBytes(breakdown.other))")
+                    Spacer(minLength: 2)
+                    Text("剩余 \(Fmt.compactBytes(breakdown.free))")
+                        .font(.system(size: 9, design: .monospaced))
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(1)
+                }
+            }
+
+            Text(gpuMemoryNote)
                 .font(.system(size: 9.5))
                 .foregroundStyle(.tertiary)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -198,7 +225,7 @@ struct RunningAppsPanelView: View {
                     .foregroundStyle(.secondary)
                 Spacer()
                 if let memory = model.metrics?.memory {
-                    Text("\(Fmt.bytes(Double(memory.used))) / \(Fmt.bytes(Double(memory.total)))")
+                    Text("\(Fmt.compactBytes(Double(memory.used))) / \(Fmt.compactBytes(Double(memory.total)))")
                         .font(.system(size: 10.5, weight: .medium, design: .monospaced))
                         .foregroundStyle(.secondary)
                 }
@@ -209,6 +236,69 @@ struct RunningAppsPanelView: View {
                 detailPair("压力", pressureText)
             }
         }
+    }
+
+    private var gpuMemoryText: String {
+        guard let used = model.metrics?.gpu.memoryUsed else { return "—" }
+        guard let total = model.metrics?.gpu.memoryTotal, total > 0 else {
+            return "\(Fmt.compactBytes(used)) / —"
+        }
+        return "\(Fmt.compactBytes(used)) / \(Fmt.compactBytes(total))"
+    }
+
+    private var gpuMemoryNote: String {
+        if model.metrics?.gpu.memoryTotal != nil {
+            return "GPU 与 CPU 共享同一块统一内存，内存紧张时显存也会被压缩；每进程仅统计提交了 GPU 工作的任务"
+        }
+        return "此处为 GPU 已用显存；每进程仅统计提交了 GPU 工作的任务"
+    }
+
+    /// GPU 显存 + 系统内存的占用构成（用于双色堆叠条）
+    private struct MemoryBreakdown {
+        let total: Double
+        let gpu: Double
+        let other: Double
+        let free: Double
+
+        var gpuRatio: Double { total > 0 ? min(1, gpu / total) : 0 }
+        var otherRatio: Double {
+            guard total > 0 else { return 0 }
+            return min(1 - gpuRatio, max(0, other) / total)
+        }
+    }
+
+    private var gpuMemoryBreakdown: MemoryBreakdown? {
+        guard let gpuUsed = model.metrics?.gpu.memoryUsed, let memory = model.metrics?.memory, memory.total > 0 else {
+            return nil
+        }
+        let total = Double(memory.total)
+        let used = min(total, Double(memory.used))
+        // GPU 的「In use system memory」本来就包含在系统已用内存里，不能重复计
+        let gpu = min(gpuUsed, used > 0 ? used : gpuUsed)
+        return MemoryBreakdown(
+            total: total,
+            gpu: gpu,
+            other: max(0, used - gpu),
+            free: max(0, total - used)
+        )
+    }
+
+    private func legendDot(color: Color, text: String) -> some View {
+        HStack(spacing: 3) {
+            Circle()
+                .fill(color)
+                .frame(width: 5, height: 5)
+            Text(text)
+                .font(.system(size: 9, design: .monospaced))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+        }
+    }
+
+    private var gpuMemoryRatio: Double? {
+        guard let used = model.metrics?.gpu.memoryUsed,
+              let total = model.metrics?.gpu.memoryTotal, total > 0 else { return nil }
+        return used / total
     }
 
     private var swapText: String {
@@ -234,6 +324,81 @@ struct RunningAppsPanelView: View {
                 .font(.system(size: 10.5, weight: .medium, design: .monospaced))
                 .foregroundStyle(.secondary)
         }
+    }
+
+    /// 每核占用柱状图，左侧带 100% / 50% / 0% 纵坐标和三条网格线，方便读出具体数值
+    private func coreChart(_ cores: [Double]) -> some View {
+        let chartHeight: CGFloat = 34
+        let axisFont = Font.system(size: 8.5, weight: .medium, design: .monospaced)
+        let barSpacing: CGFloat = cores.count > 12 ? 1 : 2
+        return HStack(alignment: .top, spacing: 4) {
+            // 三个标签用 offset 精确居中到三条网格线上（offset 不参与布局，卡片内边距可容纳少量外溢）
+            ZStack(alignment: .topTrailing) {
+                Text("100%").offset(y: -5)
+                Text("50%").offset(y: chartHeight / 2 - 5)
+                Text("0%").offset(y: chartHeight - 5)
+            }
+            .font(axisFont)
+            .foregroundStyle(.tertiary)
+            .frame(width: 26, height: chartHeight, alignment: .topTrailing)
+
+            ZStack(alignment: .topLeading) {
+                HStack(alignment: .bottom, spacing: barSpacing) {
+                    ForEach(cores.indices, id: \.self) { index in
+                        VStack(spacing: 0) {
+                            Spacer(minLength: 0)
+                            RoundedRectangle(cornerRadius: 1.5, style: .continuous)
+                                .fill(coreColor(cores[index]))
+                                .frame(height: barHeight(cores[index], chartHeight: chartHeight))
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                }
+                .frame(height: chartHeight, alignment: .bottom)
+
+                // 网格线压在柱子之上，高核数时也不会被柱子切成一段一段
+                VStack(spacing: 0) {
+                    gridLine
+                    Spacer(minLength: 0)
+                    gridLine
+                    Spacer(minLength: 0)
+                    gridLine
+                }
+            }
+            .frame(height: chartHeight)
+        }
+        .help(coreHelp(cores))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(coreHelp(cores))
+    }
+
+    private func barHeight(_ value: Double, chartHeight: CGFloat) -> CGFloat {
+        let clamped = min(1, max(0, value))
+        // 空闲核心留 1pt 的点，而不是 2pt 的柱子压住 0% 基线
+        if clamped < 0.02 { return 1 }
+        return max(2, (chartHeight * CGFloat(clamped)).rounded())
+    }
+
+    private var gridLine: some View {
+        Rectangle()
+            .fill(Color.primary.opacity(0.14))
+            .frame(height: 0.5)
+    }
+
+    /// tooltip 是单行，核心多了要自己换行
+    private func coreHelp(_ cores: [Double]) -> String {
+        guard !cores.isEmpty else { return "每个核心的占用" }
+        var lines: [String] = []
+        var current: [String] = []
+        for (index, value) in cores.enumerated() {
+            current.append("#\(index + 1) \(Fmt.percent(value))")
+            if current.count == 4 {
+                lines.append(current.joined(separator: " · "))
+                current.removeAll(keepingCapacity: true)
+            }
+        }
+        if !current.isEmpty { lines.append(current.joined(separator: " · ")) }
+        return lines.joined(separator: "\n")
     }
 
     private func coreColor(_ value: Double) -> Color {

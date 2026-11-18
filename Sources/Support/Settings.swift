@@ -245,6 +245,8 @@ struct AppSettings: Codable {
     var clipboardMaxItems: Int = 500
     var skipSensitive: Bool = true
     var maxImageBytes: Int = 10 * 1024 * 1024
+    /// 悬停预览时是否读取文本文件内容（会触发起系统文件访问授权）
+    var previewFileContents: Bool = true
     var clipboardPanelHeight: Double = 460
 
     // 系统
@@ -273,6 +275,7 @@ struct AppSettings: Codable {
         clipboardMaxItems = (try? c.decodeIfPresent(Int.self, forKey: .clipboardMaxItems)) ?? d.clipboardMaxItems
         skipSensitive = (try? c.decodeIfPresent(Bool.self, forKey: .skipSensitive)) ?? d.skipSensitive
         maxImageBytes = (try? c.decodeIfPresent(Int.self, forKey: .maxImageBytes)) ?? d.maxImageBytes
+        previewFileContents = (try? c.decodeIfPresent(Bool.self, forKey: .previewFileContents)) ?? d.previewFileContents
         clipboardPanelHeight = (try? c.decodeIfPresent(Double.self, forKey: .clipboardPanelHeight)) ?? d.clipboardPanelHeight
         launchAtLogin = (try? c.decodeIfPresent(Bool.self, forKey: .launchAtLogin)) ?? d.launchAtLogin
         hotKey = (try? c.decodeIfPresent(HotKeyConfig.self, forKey: .hotKey)) ?? d.hotKey

@@ -94,11 +94,18 @@ struct GPUSample {
     var utilization: Double?
     var rendererUtilization: Double?
     var memoryUsed: Double?
+    /// Apple Silicon 是统一内存：GPU 可用总量就是物理内存
+    var memoryTotal: Double?
 }
 
 final class GPUReader {
     func sample() -> GPUSample {
         var sample = GPUSample()
+        // Apple Silicon 是统一内存，GPU 可用的就是整块物理内存；
+        // Intel 的独显/核显显存要走别的 IORegistry 键，这里不臆造
+        #if arch(arm64)
+        sample.memoryTotal = Double(ProcessInfo.processInfo.physicalMemory)
+        #endif
         let service = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("IOAccelerator"))
         guard service != 0 else { return sample }
         defer { IOObjectRelease(service) }

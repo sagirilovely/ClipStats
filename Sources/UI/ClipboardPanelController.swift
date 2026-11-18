@@ -18,14 +18,29 @@ final class ClipboardPanelController: NSObject, NSWindowDelegate {
 
     private let panelWidth: CGFloat = 390
 
+    /// 悬停预览浮层（图片大图 / 文本内容 / 文件清单）
+    private lazy var preview: ClipboardPreviewController = {
+        let controller = ClipboardPreviewController(store: store)
+        controller.anchorProvider = { [weak self] in self?.panel?.frame }
+        return controller
+    }()
+
     init(store: SettingsStore = .shared) {
         self.store = store
         super.init()
+        model.onHoverPreview = { [weak self] item in
+            guard let self else { return }
+            self.preview.hover(item)
+        }
     }
 
     func applyAppearance(_ mode: InterfaceAppearance) {
         panel?.appearance = mode.nsAppearance
+        preview.applyAppearance(mode)
     }
+
+    /// 调试 / 截图用
+    var previewContentView: NSView? { preview.contentView }
 
     func show(anchor: NSRect) {
         let panel = ensurePanel()
@@ -64,6 +79,7 @@ final class ClipboardPanelController: NSObject, NSWindowDelegate {
     var panelContentView: NSView? { panel?.contentView }
 
     func hide() {
+        preview.hide()
         guard let panel, panel.isVisible else { return }
         panel.orderOut(nil)
         removeMonitors()

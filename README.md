@@ -59,7 +59,7 @@
 | **辅助功能权限 (AX)** | **❌ 零权限要求 (更安全)** | ❌ 不需要 | ⚠️ 需要辅助功能 | ⚠️ 需要辅助功能 | ⚠️ 需要辅助功能 |
 | **常驻内存开销** | **约 18–25 MB** | 约 60–120 MB | 约 30–50 MB | 约 100–250 MB | 约 80–180 MB |
 | **Apple Silicon SMC 温度** | **✅ 运行时动态自适应枚举** | ✅ 支持 | — | ✅ 支持 | — |
-| **运行进程列表与管理** | **✅ 实时 CPU/GPU/内存/网络 Top5** | ✅ 支持 | — | ✅ 支持 | — |
+| **运行进程列表与管理** | **✅ 实时 CPU/GPU/内存/网络排序 + 释放** | ✅ 支持 | — | ✅ 支持 | — |
 | **网速垂直双行布局** | **✅ 支持 (节约 50% 宽度)** | ✅ 支持 | — | ✅ 支持 | — |
 | **免 Xcode 快速构建** | **✅ 纯命令行 (Makefile + swiftc)** | ⚠️ 依赖 Xcode | ⚠️ 依赖 Xcode | ❌ 闭源商业软件 | ❌ 闭源商业软件 |
 | **开源免费与隐私** | **✅ 100% MIT 开源，零联网** | ✅ MIT 开源 | ✅ MIT 开源 | ❌ 付费订阅 | ❌ 付费订阅 |
@@ -86,13 +86,16 @@
 - **独立分段悬停响应**：光标移动到哪个指标上，该模块便独立亮起柔和的液态微光；移出后恢复，提供清晰的按钮级反馈。
 - **四大分类进程详情**：
   - 点击 CPU / GPU / 内存 / 网络分段，即可展开对应的分类进程面板。
-  - 实时显示当前资源占用最高的 **Top 5 前后台应用与进程**。
-  - 展示应用高清图标、实际进程名称与瞬时占用绝对值/百分比。
-  - 提供**一键终止进程（Kill）**快捷操作，快速处理卡死或异常高占用的后台程序。
+  - 按当前指标（CPU / GPU / 网速 / 内存）从高到低列出**全部用户应用**，只统计 Dock 里可见的 App，不混入系统守护进程。
+  - 展示应用高清图标、实际进程名称、运行时长与瞬时占用绝对值/百分比；Electron 与浏览器的辅助进程会归并回所属应用。
+  - **CPU 详情卡**附带带纵坐标（100% / 50% / 0）的每核柱状图，一眼读出具体占用；**GPU 详情卡**把统一内存拆成「GPU 已用显存 / 系统其它部分已用 / 剩余」三段双色堆叠条，不会误读成「显存几乎没被占用」。
+  - 网速模式下按进程归算上下行流量（来自系统 `nettop`，代理流量归属代理进程）。
+  - 提供**「释放」正常退出**按钮；若应用无响应，二次确认后可强制退出，避免误杀丢数据。
 
 ### 3. 📋 原生隐私剪贴板历史 (Clipboard History)
 - **全类型原生捕获**：毫秒级自动捕获纯文本、富文本（RTF/HTML）、图片（PNG/JPEG/TIFF）及文件路径列表。
 - **瞬时过滤与搜索**：内置极速检索输入框与「全部 / 文本 / 图片 / 文件」四路分类标签，支持键盘上下光标秒级选定。
+- **悬停即时预览**：鼠标停留 0.35 秒即在面板侧边浮出无焦点浮层——图片看原图大图、文本看内容摘录、文件看清单与文本文件前几行，不必「点一下才知道是什么」而误把旧内容塞回剪贴板。
 - **一键置顶与智能去重**：常用代码片段、账号或文本一键 Pin 置顶；相同内容重复复制时自动刷新时间戳并归拢置顶，杜绝列表冗余。
 - **隐私保护与密码避让**：自动侦测并跳过带有 `org.nspasteboard.ConcealedType` 与常见密码管理器（1Password、Bitwarden、KeepassXC 等）标记的敏感条目。
 - **零辅助功能权限 (No Accessibility Permissions)**：基于 macOS 底层 Carbon `RegisterEventHotKey`（默认快捷键 `⌥⌘V`），无需开启隐私辅助功能注入，安全无后门。
@@ -124,7 +127,12 @@
 | 进程详情面板（点击状态栏指标呼出） | 原生剪贴板面板（默认快捷键 `⌥⌘V`） |
 | :---: | :---: |
 | <img src="docs/screenshots/running-apps.png" alt="运行进程面板" width="380" /> | <img src="docs/screenshots/clipboard-panel.png" alt="剪贴板历史面板" width="380" /> |
-| <sub>实时 Top 5 资源排序，支持 CPU/GPU/内存/网络切换，一键终止进程</sub> | <sub>文本/图片/文件秒级检索，分类过滤，一键置顶与安全复制</sub> |
+| <sub>按当前指标排序全部用户应用，CPU 每核柱状图带纵坐标，GPU 显示显存已用/总</sub> | <sub>文本/图片/文件秒级检索，分类过滤，一键置顶与安全复制</sub> |
+
+| 悬停预览：图片直接看原图 | 悬停预览：文本内容摘录 | 悬停预览：文件清单 |
+| :---: | :---: | :---: |
+| <img src="docs/screenshots/preview-image.png" alt="悬停图片预览" width="300" /> | <img src="docs/screenshots/preview-text.png" alt="悬停文本预览" width="300" /> | <img src="docs/screenshots/preview-files.png" alt="悬停文件预览" width="300" /> |
+| <sub>原图按比例缩到 360pt 内，标注真实像素尺寸</sub> | <sub>高度按真实字体测量，长文本以省略号收尾</sub> | <sub>文本文件显示前几行；图片、PDF 只显示文件信息</sub> |
 
 ---
 
@@ -290,6 +298,9 @@ CLIPSTATS_DIAG=1 CLIPSTATS_DIAG_SHOW=apps CLIPSTATS_DIAG_APPS_MODE=cpu ./build/C
 
 # 4. 指定独立的测试数据目录（避免污染生产剪贴板记录）
 CLIPSTATS_DATA_DIR=/tmp/clipstats-dev ./build/ClipStats.app/Contents/MacOS/ClipStats
+
+# 5. 走真实 hover 链路验证悬停预览（image / text / files）
+CLIPSTATS_DIAG=1 CLIPSTATS_DIAG_SHOW=preview CLIPSTATS_DIAG_PREVIEW_KIND=image ./build/ClipStats.app/Contents/MacOS/ClipStats
 ```
 
 ---

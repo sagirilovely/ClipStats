@@ -559,6 +559,14 @@ struct SettingsView: View {
                         Text("自动识别 org.nspasteboard.ConcealedType 标记，1Password、Bitwarden 等密码管理器复制的内容不会记录入库。")
                             .font(.system(size: 11))
                             .foregroundStyle(.secondary)
+
+                        Divider().opacity(0.4)
+
+                        Toggle("悬停预览时读取文本文件内容", isOn: binding(\.previewFileContents))
+                            .font(.system(size: 12.5))
+                        Text("悬停剪贴板里的文件条目时，读取文本文件的前几行做预览。读取桌面、文稿、下载等受系统保护的目录时，macOS 会弹一次文件访问授权；关闭此项后只显示文件名与大小。")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
                     }
                 }
 

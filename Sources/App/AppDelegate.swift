@@ -217,6 +217,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                         NSLog("%@", "DIAG panel visible=\(visible) windows=\(NSApp.windows.map { "\($0.className):\($0.isVisible):\($0.frame)" })")
                     }
                 }
+            } else if show == "preview" {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+                    guard let self else { return }
+                    self.panelController.show(anchor: self.statusBar.anchorFrame)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                        let kind = ProcessInfo.processInfo.environment["CLIPSTATS_DIAG_PREVIEW_KIND"] ?? "image"
+                        let item = self.panelController.model.items.first { $0.kind.rawValue == kind }
+                            ?? self.panelController.model.items.first
+                        guard let item else {
+                            NSLog("%@", "DIAG preview: no items in list")
+                            return
+                        }
+                        NSLog("%@", "DIAG preview kind=\(item.kind.rawValue) id=\(item.id) source=\(item.sourceApp ?? "-")")
+                        // 走真实的 hover 链路（延迟、token、加载都覆盖），而不是直接弹窗
+                        self.panelController.model.setHovered(item.id, true)
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) {
+                            if let view = self.panelController.previewContentView {
+                                self.snapshot(view, to: "/tmp/shot-preview-\(kind).png")
+                            } else {
+                                NSLog("%@", "DIAG preview: content view missing")
+                            }
+                            NSLog("%@", "DIAG preview windows=\(NSApp.windows.map { "\($0.className):\($0.isVisible):\($0.frame)" })")
+                        }
+                    }
+                }
             } else if show == "apps" {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
                     guard let self else { return }

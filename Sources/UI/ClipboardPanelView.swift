@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import Combine
 
 struct ClipboardPanelView: View {
     @ObservedObject var model: ClipboardPanelModel
@@ -154,6 +155,9 @@ struct ClipboardPanelView: View {
                     }
                     .padding(.horizontal, 8)
                     .padding(.vertical, 6)
+                }
+                .onReceive(NotificationCenter.default.publisher(for: NSScrollView.didLiveScrollNotification)) { _ in
+                    model.dismissHoverPreview()
                 }
             }
         }
