@@ -95,7 +95,7 @@ struct RunningAppsPanelView: View {
         }
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .liquidGlassCard(cornerRadius: 10)
+        .liquidGlassCard(cornerRadius: LiquidGlassMetrics.concentric(inset: 14))
     }
 
     // CPU 详情：总占用 + 每核 + 温度

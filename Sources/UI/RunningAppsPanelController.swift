@@ -67,6 +67,7 @@ final class RunningAppsPanelController: NSObject, NSWindowDelegate {
 
         NSApp.activate(ignoringOtherApps: true)
         panel.makeKeyAndOrderFront(nil)
+        PanelPresentation.present(panel)
 
         model.resumeBackgroundSampling()
         installMonitors()
@@ -79,7 +80,7 @@ final class RunningAppsPanelController: NSObject, NSWindowDelegate {
 
         // 注意：即使窗口已被系统收起（锁屏/切换空间），也要把监听与定时器清理干净
         if let panel, panel.isVisible {
-            panel.orderOut(nil)
+            PanelPresentation.dismiss(panel)
         }
         removeMonitors()
         stopRefreshTimer()

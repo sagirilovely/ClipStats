@@ -144,8 +144,17 @@ enum InterfaceAppearance: String, Codable, CaseIterable, Identifiable {
 enum BarBackgroundStyle: String, Codable, CaseIterable, Identifiable {
     case none = "无"
     case solid = "纯色"
+    // rawValue 参与持久化，保持旧值不变，界面文案通过 title 展示
     case glass = "毛玻璃"
     var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .none: return "无"
+        case .solid: return "纯色"
+        case .glass: return "液态玻璃"
+        }
+    }
 }
 
 enum BarTextAlignment: String, Codable, CaseIterable, Identifiable {
@@ -162,7 +171,7 @@ struct BarAppearance: Codable {
     var horizontalPadding: Double = 6
     /// SF Symbol 图标字号
     var iconPointSize: Double = 11
-    /// 状态栏内容在稳定宽度产生的富余空间中的对齐方式
+    /// 旧版本的数值对齐选项。槽位排布后数值统一右对齐，这里只为兼容旧配置而保留。
     var textAlignment: BarTextAlignment = .leading
 
     var backgroundStyle: BarBackgroundStyle = .none

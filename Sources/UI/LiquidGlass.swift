@@ -25,6 +25,84 @@ struct VisualEffectView: NSViewRepresentable {
     }
 }
 
+// MARK: - 浮窗出现 / 收起动画（液态玻璃「展开」手感）
+
+/// 浮窗从锚点方向轻轻「胀开」并淡入，收起时反向。
+/// 真正的 matchedGeometry 玻璃形变要求两个状态在同一个窗口里，独立 NSPanel 做不到，
+/// 所以这里用同样的弹簧参数模拟「玻璃材料化」的手感：缩放幅度克制，只做 0.96 → 1。
+enum PanelPresentation {
+    /// 每个窗口一个递增 token：收起动画延迟执行期间如果又被打开，旧的 orderOut 会被丢弃
+    private static var tokens: [ObjectIdentifier: Int] = [:]
+
+    private static var reduceMotion: Bool {
+        NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+    }
+
+    @discardableResult
+    private static func bumpToken(_ window: NSWindow) -> Int {
+        let key = ObjectIdentifier(window)
+        let next = (tokens[key] ?? 0) + 1
+        tokens[key] = next
+        return next
+    }
+
+    static func present(_ window: NSWindow) {
+        bumpToken(window)
+        window.orderFront(nil)
+        guard !reduceMotion, let layer = window.contentView?.layer else { return }
+        layer.transform = CATransform3DIdentity
+        layer.opacity = 1
+
+        let spring = CASpringAnimation(keyPath: "transform")
+        spring.fromValue = NSValue(caTransform3D: CATransform3DMakeScale(0.96, 0.96, 1))
+        spring.toValue = NSValue(caTransform3D: CATransform3DIdentity)
+        spring.mass = 1
+        spring.stiffness = 260
+        spring.damping = 20
+        spring.initialVelocity = 1.2
+        spring.duration = spring.settlingDuration
+        layer.add(spring, forKey: "clipstats.present.scale")
+
+        let fade = CABasicAnimation(keyPath: "opacity")
+        fade.fromValue = 0
+        fade.toValue = 1
+        fade.duration = 0.16
+        fade.timingFunction = CAMediaTimingFunction(name: .easeOut)
+        layer.add(fade, forKey: "clipstats.present.fade")
+    }
+
+    static func dismiss(_ window: NSWindow, completion: (() -> Void)? = nil) {
+        let token = bumpToken(window)
+        guard !reduceMotion, let layer = window.contentView?.layer else {
+            window.orderOut(nil)
+            completion?()
+            return
+        }
+        let shrink = CABasicAnimation(keyPath: "transform")
+        shrink.fromValue = NSValue(caTransform3D: CATransform3DIdentity)
+        shrink.toValue = NSValue(caTransform3D: CATransform3DMakeScale(0.97, 0.97, 1))
+        shrink.duration = 0.12
+        shrink.timingFunction = CAMediaTimingFunction(name: .easeIn)
+        layer.add(shrink, forKey: "clipstats.dismiss.scale")
+
+        let fade = CABasicAnimation(keyPath: "opacity")
+        fade.fromValue = 1
+        fade.toValue = 0
+        fade.duration = 0.12
+        fade.timingFunction = CAMediaTimingFunction(name: .easeIn)
+        layer.add(fade, forKey: "clipstats.dismiss.fade")
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+            guard tokens[ObjectIdentifier(window)] == token else { return }
+            window.orderOut(nil)
+            layer.removeAllAnimations()
+            layer.transform = CATransform3DIdentity
+            layer.opacity = 1
+            completion?()
+        }
+    }
+}
+
 // MARK: - 界面主题
 
 extension InterfaceAppearance {
@@ -42,6 +120,20 @@ extension InterfaceAppearance {
         case .light: return NSAppearance(named: .aqua)
         case .dark: return NSAppearance(named: .darkAqua)
         }
+    }
+}
+
+// MARK: - 玻璃几何（同心圆角）
+
+/// HIG：嵌套圆角要「同心」——内圆角 = 外圆角 − 内边距，
+/// 否则内层会显得过尖（pinched）或外张（flared）。
+enum LiquidGlassMetrics {
+    /// 浮窗面板圆角
+    static let panelRadius: CGFloat = 20
+
+    /// 与面板同心：内边距 inset 处的圆角
+    static func concentric(inset: CGFloat, outer: CGFloat = panelRadius, minimum: CGFloat = 8) -> CGFloat {
+        max(minimum, outer - inset)
     }
 }
 
@@ -178,24 +270,40 @@ struct GlassBackdrop: View {
 
 struct LiquidGlassPanelModifier: ViewModifier {
     @Environment(\.colorScheme) private var colorScheme
+    /// 系统「降低透明度」开启时自动退回不透明底，保证可读性（HIG 要求）
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     var cornerRadius: CGFloat = 20
 
+    @ViewBuilder
     func body(content: Content) -> some View {
-        content
-            .background(
-                GlassBackdrop(material: colorScheme == .dark ? .hudWindow : .popover)
-            )
-            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .strokeBorder(LiquidGlassStyle.rimStrokeGradient(for: colorScheme), lineWidth: 0.9)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: cornerRadius - 1, style: .continuous)
-                    .strokeBorder(Color.white.opacity(colorScheme == .dark ? 0.045 : 0.22), lineWidth: 0.5)
-                    .padding(1)
-            )
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        if #available(macOS 26.0, *), !reduceTransparency {
+            // macOS 26+：真正的液态玻璃，折射 / 边缘高光 / 焦点感知都交给系统，
+            // 我们只补一条 hairline 保证边界清晰（不再叠第二层玻璃或自定义渐变）。
+            content
+                .glassEffect(.regular, in: shape)
+                .overlay(
+                    shape.strokeBorder(
+                        Color.white.opacity(colorScheme == .dark ? 0.14 : 0.34),
+                        lineWidth: 0.5
+                    )
+                )
+        } else {
+            content
+                .background(
+                    GlassBackdrop(material: colorScheme == .dark ? .hudWindow : .popover)
+                )
+                .clipShape(shape)
+                .overlay(
+                    shape.strokeBorder(LiquidGlassStyle.rimStrokeGradient(for: colorScheme), lineWidth: 0.9)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: max(0, cornerRadius - 1), style: .continuous)
+                        .strokeBorder(Color.white.opacity(colorScheme == .dark ? 0.045 : 0.22), lineWidth: 0.5)
+                        .padding(1)
+                )
             // 浮层阴影由 NSPanel 统一绘制，避免列表滚动时反复离屏合成。
+        }
     }
 }
 
@@ -306,8 +414,27 @@ struct LiquidGlassButtonStyle: ButtonStyle {
 
 struct LiquidGlassIconButtonStyle: ButtonStyle {
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
+    @ViewBuilder
     func makeBody(configuration: Configuration) -> some View {
+        if #available(macOS 26.0, *), !reduceTransparency {
+            // macOS 26 起让按钮自己变成一块可交互的系统玻璃（等价于 .buttonStyle(.glass)，
+            // 但保留我们固定的 29×29 圆形尺寸与按下缩放）
+            configuration.label
+                .font(.system(size: 11.5, weight: .medium))
+                .foregroundStyle(Color.primary.opacity(0.82))
+                .frame(width: 29, height: 29)
+                .contentShape(Circle())
+                .glassEffect(.regular.interactive(), in: Circle())
+                .scaleEffect(configuration.isPressed ? 0.92 : 1)
+                .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+        } else {
+            legacyBody(configuration: configuration)
+        }
+    }
+
+    private func legacyBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.system(size: 11.5, weight: .medium))
             .foregroundStyle(Color.primary.opacity(0.82))

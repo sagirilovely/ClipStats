@@ -57,7 +57,7 @@ struct ClipboardPanelView: View {
             }
             .padding(.horizontal, 11)
             .padding(.vertical, 8)
-            .liquidGlassControl(cornerRadius: 12, isActive: searchFocused)
+            .liquidGlassControl(cornerRadius: LiquidGlassMetrics.concentric(inset: 11), isActive: searchFocused)
 
             // 快捷类型筛选药丸
             HStack {

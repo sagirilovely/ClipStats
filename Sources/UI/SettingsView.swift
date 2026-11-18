@@ -13,10 +13,31 @@ struct SettingsView: View {
             contentArea
         }
         .frame(width: 760, height: 620)
-        .background(GlassBackdrop(material: .underWindowBackground))
+        .background { settingsWindowBackdrop }
         .preferredColorScheme(store.settings.interfaceAppearance.colorScheme)
         .onAppear { viewModel.refreshCount() }
         .onDisappear { viewModel.stopRecording() }
+    }
+
+    /// 窗口底：macOS 26 起用系统液态玻璃，旧系统退回 vibrancy。
+    /// 玻璃上再压一层很淡的窗口底色，保证长文本的对比度（HIG：可读性优先于质感）。
+    @ViewBuilder
+    private var settingsWindowBackdrop: some View {
+        #if os(macOS)
+        if #available(macOS 26.0, *),
+           !NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency {
+            ZStack {
+                Color.clear
+                    .glassEffect(.regular, in: .rect(cornerRadius: 12))
+                Color(nsColor: .windowBackgroundColor)
+                    .opacity(colorScheme == .dark ? 0.62 : 0.52)
+            }
+        } else {
+            GlassBackdrop(material: .underWindowBackground)
+        }
+        #else
+        GlassBackdrop(material: .underWindowBackground)
+        #endif
     }
 
     // MARK: - 顶部液态导航栏
@@ -348,28 +369,16 @@ struct SettingsView: View {
                             .foregroundStyle(.tertiary)
                         sliderRow("左右内边距", value: binding(\.appearance.horizontalPadding), range: 0...20, step: 1, suffix: "pt")
                         if store.settings.appearance.backgroundStyle != .none {
-                            Text("开背景时左右会额外保留至少 3pt，避免圆角啃到首尾文字。")
+                            Text("开背景时左右会按圆角大小自动留出 6–8pt，避免胶囊弧线压到首尾文字。")
                                 .font(.system(size: 10.5))
                                 .foregroundStyle(.tertiary)
                         }
 
                         Divider().opacity(0.3)
 
-                        HStack(spacing: 12) {
-                            Text("数值对齐")
-                                .font(.system(size: 12))
-                                .frame(width: 80, alignment: .leading)
-                            Picker("", selection: binding(\.appearance.textAlignment)) {
-                                ForEach(BarTextAlignment.allCases) { Text($0.rawValue).tag($0) }
-                            }
-                            .pickerStyle(.segmented)
-                            .labelsHidden()
-                            .frame(width: 170)
-                            Text("双行数值（如上下排列的网速）在各自列内的对齐方式；不影响模块间距")
-                                .font(.system(size: 10.5))
-                                .foregroundStyle(.secondary)
-                            Spacer()
-                        }
+                        Text("数值在固定槽位内统一右对齐（箭头之类的固定前缀贴左），这样模块右缘永远对齐、间距严格等距。")
+                            .font(.system(size: 10.5))
+                            .foregroundStyle(.tertiary)
 
                         HStack(spacing: 12) {
                             Text("网速布局")
@@ -405,7 +414,7 @@ struct SettingsView: View {
                                 .font(.system(size: 12))
                                 .frame(width: 80, alignment: .leading)
                             Picker("", selection: binding(\.appearance.backgroundStyle)) {
-                                ForEach(BarBackgroundStyle.allCases) { Text($0.rawValue).tag($0) }
+                                ForEach(BarBackgroundStyle.allCases) { Text($0.title).tag($0) }
                             }
                             .pickerStyle(.segmented)
                             .labelsHidden()
@@ -414,14 +423,19 @@ struct SettingsView: View {
                         }
 
                         if store.settings.appearance.backgroundStyle != .none {
-                            ColorPicker("背景颜色", selection: colorBinding(\.appearance.backgroundColor), supportsOpacity: false)
-                                .font(.system(size: 12))
-
                             if store.settings.appearance.backgroundStyle == .solid {
-                                sliderRow("不透明度", value: binding(\.appearance.backgroundOpacity),
-                                          range: 0.05...1, step: 0.05, suffix: "", format: "%.2f")
+                                ColorPicker("背景颜色", selection: colorBinding(\.appearance.backgroundColor), supportsOpacity: false)
+                                    .font(.system(size: 12))
                             }
+                            sliderRow("不透明度", value: binding(\.appearance.backgroundOpacity),
+                                      range: 0.05...1, step: 0.05, suffix: "", format: "%.2f")
                             sliderRow("背景圆角", value: binding(\.appearance.cornerRadius), range: 0...14, step: 1, suffix: "pt")
+
+                            if store.settings.appearance.backgroundStyle == .glass {
+                                Text("液态玻璃由系统材质绘制（折射与边缘高光），颜色不参与；不透明度控制玻璃浓度。开启后左右会自动留出与圆角匹配的呼吸空间。")
+                                    .font(.system(size: 10.5))
+                                    .foregroundStyle(.tertiary)
+                            }
                         }
                     }
                 }

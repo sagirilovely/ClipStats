@@ -350,43 +350,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    /// 自检：极端数值下的内容宽度（稳定宽度的收缩是延迟执行的，所以这里只记录内容宽度）
+    /// 自检：数值在常见区间内跳动时，状态栏总宽应当保持不变（固定槽位生效）。
     private func verifyBarWidth() {
-        var low = MetricsSnapshot()
-        low.cpu.total = 0.02
-        low.memory.total = 100
-        low.memory.used = 1
-        low.thermal.cpuTemperature = 45
-        low.thermal.cpuTemperatureAverage = 45
-        low.gpu.utilization = 0.01
-        low.network.download = 120
-        low.network.upload = 80
-
-        var high = MetricsSnapshot()
-        high.cpu.total = 1.0
-        high.memory.total = 100
-        high.memory.used = 100
-        high.thermal.cpuTemperature = 105
-        high.thermal.cpuTemperatureAverage = 105
-        high.gpu.utilization = 1.0
-        high.network.download = 999 * 1024 * 1024
-        high.network.upload = 999 * 1024 * 1024
-
-        var mid = MetricsSnapshot()
-        mid.cpu.total = 0.37
-        mid.memory.total = 100
-        mid.memory.used = 42
-        mid.thermal.cpuTemperature = 70
-        mid.thermal.cpuTemperatureAverage = 70
-        mid.gpu.utilization = 0.48
-        mid.network.download = 1_204_000
-        mid.network.upload = 86_000
-
-        // 用同一个条数比较，否则徽章位数（9/99/999）变化会被当成宽度抖动
-        let widths = [(low, 42), (mid, 42), (high, 42)].map { pair in
-            self.statusBar.width(for: pair.0, count: pair.1)
+        func snapshot(cpu: Double, gpu: Double, memoryUsed: UInt64, temperature: Double,
+                      down: Double, up: Double) -> MetricsSnapshot {
+            var s = MetricsSnapshot()
+            s.cpu.total = cpu
+            s.gpu.utilization = gpu
+            s.memory.total = 100
+            s.memory.used = memoryUsed
+            s.thermal.cpuTemperature = temperature
+            s.thermal.cpuTemperatureAverage = temperature
+            s.network.download = down
+            s.network.upload = up
+            return s
         }
-        NSLog("%@", "DIAG bar content widths low/mid/high = \(widths)")
+
+        // 覆盖用户实际会遇到的范围：个位数 / 两位小数网速 / 空闲 / 高速
+        let samples: [(String, MetricsSnapshot, Int)] = [
+            ("idle", snapshot(cpu: 0.02, gpu: 0.01, memoryUsed: 1, temperature: 45,
+                              down: 0, up: 0), 9),
+            ("low", snapshot(cpu: 0.08, gpu: 0.09, memoryUsed: 42, temperature: 51,
+                             down: 120, up: 80), 42),
+            ("mid", snapshot(cpu: 0.26, gpu: 0.48, memoryUsed: 78, temperature: 63,
+                             down: 1_204_000, up: 86_000), 42),
+            ("busy", snapshot(cpu: 0.99, gpu: 0.99, memoryUsed: 99, temperature: 99,
+                              down: 9_999_999, up: 9_999_999), 99),
+            ("extreme", snapshot(cpu: 1.0, gpu: 1.0, memoryUsed: 100, temperature: 105,
+                                 down: 999 * 1024 * 1024, up: 852 * 1024 * 1024), 99),
+        ]
+        let widths = samples.map { self.statusBar.width(for: $0.1, count: $0.2) }
+        let normal = Array(widths.prefix(4))
+        let stable = Set(normal).count == 1
+        let detail = zip(samples.map(\.0), widths).map { "\($0)=\(Int($1))" }.joined(separator: " ")
+        NSLog("%@", "DIAG bar widths \(detail) stable(idle..busy)=\(stable)")
     }
 
     private func captureSettingsTabs() {

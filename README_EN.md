@@ -42,7 +42,7 @@ Mac power users and developers often struggle with two notorious menu bar issues
 
 **ClipStats was created to deliver the ultimate native 3-in-1 desktop companion:**
 - **Compact 3-in-1 Integration**: Merges comprehensive real-time system monitoring, a robust clipboard history manager, and an on-device EN ↔ ZH mini translator into a unified menu bar item compressed down to just **269pt**.
-- **Apple Liquid Glass Aesthetic**: Embraces native macOS vibrancy, specular rim reflections, ambient environmental glow, and seamless dark/light mode switching.
+- **Apple Liquid Glass Aesthetic**: On macOS 26+ the clipboard / process / translation popovers call the real system `.glassEffect` (lensing, rim highlights, focus response) and the settings window uses a system glass backdrop with a light scrim; the menu bar capsule is fully self-drawn (the menu bar is already a glass layer, so nesting system glass there only samples itself) using the platform geometry — 20pt capsule, half-height radius and an inner hairline rim. Older systems fall back to an `NSVisualEffectView` composition, and "Reduce Transparency" always degrades to an opaque surface.
 - **Interactive Segments & Running Apps Inspector**: Hovering over any metric lights up an isolated subtle glow; clicking on CPU, GPU, Memory, or Network pops up an instant top-process inspector with one-click termination.
 - **Built-in Offline EN ↔ ZH Translator**: A tiny `A文` button in both panel footers opens a 344pt popover where typing on one side instantly fills the other — no browser tab, no translation app, and inference never leaves your Mac.
 - **Zero Accessibility Permissions Required**: Leverages low-level Carbon Global HotKey APIs (`⌥⌘V`) and system pasteboard changeCount tracking. Zero invasive permissions needed.
@@ -83,7 +83,7 @@ Mac power users and developers often struggle with two notorious menu bar issues
   - Tight 2.5pt anchor between metric labels and numeric values.
   - Layout behaves like CSS **`flex + gap`**: every module takes exactly its text width and the gap between modules equals the slider value (**5–20pt**, 5pt minimum so neighbours never touch) — no more leftover slot padding on any module's right side.
   - Side padding 0–20pt. Negative *padding* is deliberately disallowed — it narrows the status-item window below its content and clips the bar; with a capsule background a 3pt corner margin is always kept.
-- **Anti-Jitter**: the bar grows instantly when a value needs more room and only shrinks after a value has stayed narrower for a few seconds, so metrics flickering between `0%` and `100%` or `10 KB/s` and `120 MB/s` no longer pull the menu bar around.
+- **Anti-Jitter**: each module reserves a hidden slot sized for its widest value and right-aligns the number inside it, so the bar's total width never budges while speeds jump between `0B` and `1.02M` or CPU moves `9%` → `26%`. The slot's spare space hides between the label and the value instead of becoming blank space on the module's right.
 - **Aesthetic Background Modes**: Choose between System Native, Custom Solid Tint (hex + opacity), or macOS **Liquid Glass** vibrancy.
 
 ### 2. ⚡ Interactive Segments & Multi-Mode Process Inspector

@@ -66,6 +66,7 @@ final class ClipboardPanelController: NSObject, NSWindowDelegate {
 
         NSApp.activate(ignoringOtherApps: true)
         panel.makeKeyAndOrderFront(nil)
+        PanelPresentation.present(panel)
         // 面板刚显示时窗口还没真正成为 key window，稍后再移一次焦点即可
         DispatchQueue.main.async { [weak self] in
             self?.model.requestFocus()
@@ -81,9 +82,9 @@ final class ClipboardPanelController: NSObject, NSWindowDelegate {
     func hide() {
         preview.hide()
         guard let panel, panel.isVisible else { return }
-        panel.orderOut(nil)
         removeMonitors()
         onVisibilityChange?(false)
+        PanelPresentation.dismiss(panel)
     }
 
     func toggle(anchor: NSRect) {

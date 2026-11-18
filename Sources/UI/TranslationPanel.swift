@@ -260,7 +260,7 @@ struct TranslationPanelView: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
-        .liquidGlassControl(cornerRadius: 10, isActive: focusedSide == side)
+        .liquidGlassControl(cornerRadius: LiquidGlassMetrics.concentric(inset: 12, outer: 18), isActive: focusedSide == side)
     }
 
     private var languagePackHint: some View {
@@ -363,6 +363,7 @@ final class TranslationPanelController: NSObject, NSWindowDelegate {
 
         NSApp.activate(ignoringOtherApps: true)
         panel.makeKeyAndOrderFront(nil)
+        PanelPresentation.present(panel)
         installKeyMonitor()
         onVisibilityChange?(true)
 
@@ -374,9 +375,9 @@ final class TranslationPanelController: NSObject, NSWindowDelegate {
 
     func hide() {
         guard let panel, panel.isVisible else { return }
-        panel.orderOut(nil)
         removeKeyMonitor()
         onVisibilityChange?(false)
+        PanelPresentation.dismiss(panel)
     }
 
     func toggle(anchor: NSRect) {
