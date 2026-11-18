@@ -300,6 +300,8 @@ struct AppSettings: Codable {
         clipboardMaxItems = min(max(clipboardMaxItems, 20), 5000)
         // 左右内边距不能为负：状态栏窗口宽度 = 内容 + 2 × 内边距，负值会把内容裁掉
         appearance.horizontalPadding = min(max(appearance.horizontalPadding, 0), 20)
+        // 模块间距不能为负：负间距等于让相邻分段重叠，文字和徽章会互相压住
+        appearance.segmentSpacing = min(max(appearance.segmentSpacing, 0), 20)
         clipboardPanelHeight = min(max(clipboardPanelHeight, 300), 900)
         barFontSize = min(max(barFontSize, 10), 16)
     }

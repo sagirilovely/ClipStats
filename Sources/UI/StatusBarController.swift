@@ -200,6 +200,10 @@ final class StatusItemView: NSView {
 
     /// 左右内边距。开启背景时至少留 3pt，否则胶囊圆角会啃到首尾字符；
     /// 负值只在「无背景」时用于贴边，绝不用来压缩窗口宽度——宽度小于内容时内容会被裁掉。
+    /// 分段之间的实际间距。负的「模块间距」会让相邻分段互相压字（例如 "48°内存" 和 "1.44K19"），
+    /// 因此布局一律按 0 兜底，负值只在设置里保留兼容、实际按 0 处理。
+    private var gap: CGFloat { max(0, style.spacing) }
+
     private var sideInset: CGFloat {
         let minimum: CGFloat = style.backgroundStyle == .none ? 0 : 3
         return max(minimum, style.padding)
@@ -330,7 +334,7 @@ final class StatusItemView: NSView {
     private func totalWidth(of items: [SegmentLayout]) -> CGFloat {
         var contentTotal: CGFloat = 0
         for (index, item) in items.enumerated() {
-            if index > 0 { contentTotal += style.spacing }
+            if index > 0 { contentTotal += gap }
             contentTotal += item.totalWidth
         }
         let total = contentTotal + sideInset * 2
@@ -358,13 +362,13 @@ final class StatusItemView: NSView {
     /// 自检：返回每个分段对应的点击区间
     func debugSegmentRects() -> [(String, NSRect)] {
         let contentTotal = cachedLayout.enumerated().reduce(CGFloat(0)) { sum, elem in
-            sum + elem.element.totalWidth + (elem.offset > 0 ? style.spacing : 0)
+            sum + elem.element.totalWidth + (elem.offset > 0 ? gap : 0)
         }
         let startX = max(0, sideInset)
         var x = startX
         var result: [(String, NSRect)] = []
         for (index, item) in cachedLayout.enumerated() {
-            if index > 0 { x += style.spacing }
+            if index > 0 { x += gap }
             result.append((item.kind?.rawValue ?? "nil",
                            NSRect(x: x, y: 0, width: item.totalWidth, height: bounds.height)))
             x += item.totalWidth
@@ -398,16 +402,16 @@ final class StatusItemView: NSView {
         hitViews.removeAll()
 
         let contentTotal = cachedLayout.enumerated().reduce(CGFloat(0)) { sum, elem in
-            sum + elem.element.totalWidth + (elem.offset > 0 ? style.spacing : 0)
+            sum + elem.element.totalWidth + (elem.offset > 0 ? gap : 0)
         }
         let startX = max(0, sideInset)
         var x = startX
 
         for (index, item) in cachedLayout.enumerated() {
-            let leftBoundary = (index == 0) ? 0 : (x - style.spacing / 2)
+            let leftBoundary = (index == 0) ? 0 : (x - gap / 2)
             let rightBoundary = (index == cachedLayout.count - 1)
                 ? bounds.width
-                : (x + item.totalWidth + style.spacing / 2)
+                : (x + item.totalWidth + gap / 2)
             let hitFrame = NSRect(
                 x: max(0, leftBoundary),
                 y: 0,
@@ -431,7 +435,7 @@ final class StatusItemView: NSView {
             }
             addSubview(hitView)
             hitViews.append(hitView)
-            x += item.totalWidth + style.spacing
+            x += item.totalWidth + gap
         }
     }
 
@@ -509,13 +513,13 @@ final class StatusItemView: NSView {
         }
 
         let contentTotal = cachedLayout.enumerated().reduce(CGFloat(0)) { sum, elem in
-            sum + elem.element.totalWidth + (elem.offset > 0 ? style.spacing : 0)
+            sum + elem.element.totalWidth + (elem.offset > 0 ? gap : 0)
         }
         let startX = max(0, sideInset)
         var x = startX
 
         for (index, item) in cachedLayout.enumerated() {
-            if index > 0 { x += style.spacing }
+            if index > 0 { x += gap }
 
             let isActive = isPanelOpen && (item.kind != nil && item.kind == activeSegmentKind)
             let isHovered = (hoveredIndex == index) || (debugHover && (debugHoverIndex == nil ? index == 0 : debugHoverIndex == index))
@@ -795,20 +799,20 @@ final class StatusItemView: NSView {
         guard !cachedLayout.isEmpty else { return nil }
         let clamped = min(max(rawX, 0), bounds.width)
         let contentTotal = cachedLayout.enumerated().reduce(CGFloat(0)) { sum, elem in
-            sum + elem.element.totalWidth + (elem.offset > 0 ? style.spacing : 0)
+            sum + elem.element.totalWidth + (elem.offset > 0 ? gap : 0)
         }
         let startX = max(0, sideInset)
         var x = startX
 
         for (index, item) in cachedLayout.enumerated() {
-            let leftBoundary = (index == 0) ? 0 : (x - style.spacing / 2)
+            let leftBoundary = (index == 0) ? 0 : (x - gap / 2)
             let rightBoundary = (index == cachedLayout.count - 1)
                 ? bounds.width
-                : (x + item.totalWidth + style.spacing / 2)
+                : (x + item.totalWidth + gap / 2)
             if clamped >= leftBoundary && clamped < rightBoundary {
                 return index
             }
-            x += item.totalWidth + style.spacing
+            x += item.totalWidth + gap
         }
         return nil
     }
