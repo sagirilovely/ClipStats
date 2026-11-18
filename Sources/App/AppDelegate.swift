@@ -32,6 +32,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self.panelController.toggle(anchor: anchor)
             } else {
                 self.panelController.hide()
+                self.appsController.model.mode = Self.metricMode(for: kind)
+                self.appsController.model.metrics = self.latest
                 self.appsController.toggle(anchor: anchor)
             }
         }
@@ -80,6 +82,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard let self else { return }
             self.latest = snapshot
             self.statusBar.update(snapshot)
+            if self.appsController?.isVisible == true {
+                self.appsController.model.metrics = snapshot
+            }
             self.logDiagnostics(snapshot)
         }
 
@@ -196,6 +201,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
                         let visible = self.panelController.isVisible
                         NSLog("%@", "DIAG panel visible=\(visible) windows=\(NSApp.windows.map { "\($0.className):\($0.isVisible):\($0.frame)" })")
+                    }
+                }
+            } else if show == "apps" {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+                    guard let self else { return }
+                    if let modeText = ProcessInfo.processInfo.environment["CLIPSTATS_DIAG_APPS_MODE"],
+                       let mode = MetricMode(rawValue: modeText) {
+                        self.appsController.model.mode = mode
+                    }
+                    self.appsController.model.metrics = self.latest
+                    self.appsController.show(anchor: self.statusBar.anchorFrame)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) {
+                        if let view = self.appsController.panelContentView {
+                            self.snapshot(view, to: "/tmp/shot-apps-\(self.appsController.model.mode.rawValue).png")
+                        }
+                        NSLog("%@", "DIAG apps windows=\(NSApp.windows.map { "\($0.className):\($0.isVisible):\($0.frame)" })")
                     }
                 }
             } else if show == "snapshot" {
@@ -383,6 +404,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    /// 从哪个模块点进来，就默认按该指标排序并显示对应详情
+    private static func metricMode(for kind: SegmentKind?) -> MetricMode {
+        switch kind {
+        case .gpu: return .gpu
+        case .memory: return .memory
+        case .network: return .network
+        default: return .cpu        // CPU / 温度 / 空白区域
+        }
+    }
+
     private func thermalConsumersEnabled(_ settings: AppSettings?) -> Bool {
         guard let settings else { return true }
         let hasThermal = settings.segments.contains { $0.enabled && ($0.kind == .thermal) }
@@ -446,6 +477,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func showRunningApps() {
         panelController.hide()
+        appsController.model.metrics = latest
         appsController.show(anchor: statusBar.anchorFrame)
     }
 

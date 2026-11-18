@@ -14,6 +14,7 @@
 | `Sources/Metrics/SMCCore.swift` | `SMC/smc.swift` | AppleSMC 用户客户端的数据结构布局、命令码（readKeyInfo / readBytes / readIndex）、`IOConnectCallStructMethod` 调用方式，以及 `sp78`/`sp5a`/`sp87`/`flt`/`fpe2`/`ui*` 等数值类型的解码方式 |
 | `Sources/Metrics/SystemReaders.swift` | `Modules/CPU/readers.swift`、`Modules/RAM/readers.swift`、`Modules/GPU/reader.swift`、`Modules/Net/readers.swift` | CPU tick 差分统计、`vm_statistics64` 已用内存公式（`active + inactive + speculative + wired + compressed − purgeable − external`）、`IOAccelerator` 的 `Device Utilization %` 键名、`NET_RT_IFLIST2` + `if_msghdr2` 读取收发字节的思路 |
 | `Sources/Metrics/ThermalReader.swift` | `Modules/Sensors/readers.swift` | 枚举全部温度键并按数值范围过滤无效传感器的思路（键名分类为本项目自行实现的动态方案） |
+| `Sources/Metrics/ProcessSampler.swift` | `Modules/GPU/reader.swift`、`Modules/RAM/readers.swift` | 通过 IOAccelerator 子节点的 `IOUserClientCreator` + `AppUsage[].accumulatedGPUTime` 计算每进程 GPU 占用；用私有函数 `responsibility_get_pid_responsible_for_pid` 把辅助进程归并到所属应用的思路 |
 
 上游项目中与本项目无关的部分（风扇控制特权助手、图表、更新器、LevelDB、菜单栏 UI 等）均未使用。
 

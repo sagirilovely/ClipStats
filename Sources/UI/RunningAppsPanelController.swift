@@ -17,12 +17,13 @@ final class RunningAppsPanelController: NSObject, NSWindowDelegate {
 
     var onVisibilityChange: ((Bool) -> Void)?
 
-    private let panelWidth: CGFloat = 390
-    private let panelHeight: CGFloat = 460
+    private var panelWidth: CGFloat { RunningAppsPanelView.panelSize.width }
+    private var panelHeight: CGFloat { RunningAppsPanelView.panelSize.height }
     /// 面板弹出前的前台应用，关闭时恢复焦点
     private weak var previousApp: NSRunningApplication?
 
     var isVisible: Bool { panel?.isVisible ?? false }
+    var panelContentView: NSView? { panel?.contentView }
 
     func toggle(anchor: NSRect) {
         if isVisible {
@@ -56,6 +57,7 @@ final class RunningAppsPanelController: NSObject, NSWindowDelegate {
         NSApp.activate(ignoringOtherApps: true)
         panel.makeKeyAndOrderFront(nil)
 
+        model.resumeBackgroundSampling()
         installMonitors()
         startRefreshTimer()
         onVisibilityChange?(true)
@@ -70,6 +72,7 @@ final class RunningAppsPanelController: NSObject, NSWindowDelegate {
         }
         removeMonitors()
         stopRefreshTimer()
+        model.suspendBackgroundSampling()
         model.hoveredPID = nil
         onVisibilityChange?(false)
 
