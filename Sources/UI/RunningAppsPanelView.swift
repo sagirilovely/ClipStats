@@ -7,6 +7,8 @@ struct RunningAppsPanelView: View {
     static let panelSize = CGSize(width: 390, height: 560)
 
     @ObservedObject var model: RunningAppsModel
+    @ObservedObject var store: SettingsStore
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         VStack(spacing: 0) {
@@ -19,7 +21,8 @@ struct RunningAppsPanelView: View {
             footerSection
         }
         .frame(width: Self.panelSize.width, height: Self.panelSize.height)
-        .liquidGlassPanel(cornerRadius: 18)
+        .liquidGlassPanel(cornerRadius: 20)
+        .preferredColorScheme(store.settings.interfaceAppearance.colorScheme)
         .onAppear { model.reload() }
     }
 
@@ -36,14 +39,14 @@ struct RunningAppsPanelView: View {
 
             Spacer()
 
+            AppearanceModeButton(store: store)
+
             Button {
                 model.reload()
             } label: {
                 Image(systemName: "arrow.clockwise")
-                    .font(.system(size: 11, weight: .medium))
             }
-            .buttonStyle(.plain)
-            .foregroundStyle(.secondary)
+            .buttonStyle(LiquidGlassIconButtonStyle())
             .help("刷新列表")
             .accessibilityLabel("刷新列表")
         }
@@ -54,8 +57,8 @@ struct RunningAppsPanelView: View {
 
     private var liquidDivider: some View {
         Rectangle()
-            .fill(Color.primary.opacity(0.1))
-            .frame(height: 0.6)
+            .fill(LiquidGlassStyle.divider(for: colorScheme))
+            .frame(height: 1)
     }
 
     // MARK: - 详情
@@ -317,16 +320,8 @@ struct RunningAppsPanelView: View {
                 model.onSwitchToClipboard?()
             } label: {
                 Image(systemName: "doc.on.clipboard")
-                    .font(.system(size: 11, weight: .medium))
-                    .padding(5)
-                    .background(Color.primary.opacity(0.04))
-                    .clipShape(Circle())
-                    .overlay(
-                        Circle().strokeBorder(Color.white.opacity(0.15), lineWidth: 0.6)
-                    )
             }
-            .buttonStyle(.plain)
-            .foregroundStyle(.secondary)
+            .buttonStyle(LiquidGlassIconButtonStyle())
             .help("切换到剪贴板历史")
             .accessibilityLabel("切换到剪贴板历史")
 
@@ -334,10 +329,8 @@ struct RunningAppsPanelView: View {
                 model.onOpenSettings?()
             } label: {
                 Image(systemName: "gearshape")
-                    .font(.system(size: 11, weight: .medium))
             }
-            .buttonStyle(.plain)
-            .foregroundStyle(.secondary)
+            .buttonStyle(LiquidGlassIconButtonStyle())
             .help("打开设置")
             .accessibilityLabel("打开设置")
         }

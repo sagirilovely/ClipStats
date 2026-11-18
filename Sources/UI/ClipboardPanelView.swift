@@ -3,7 +3,9 @@ import AppKit
 
 struct ClipboardPanelView: View {
     @ObservedObject var model: ClipboardPanelModel
+    @ObservedObject var store: SettingsStore
     @FocusState private var searchFocused: Bool
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         VStack(spacing: 0) {
@@ -14,7 +16,8 @@ struct ClipboardPanelView: View {
             footerSection
         }
         .frame(width: 390, height: CGFloat(model.panelHeight))
-        .liquidGlassPanel(cornerRadius: 18)
+        .liquidGlassPanel(cornerRadius: 20)
+        .preferredColorScheme(store.settings.interfaceAppearance.colorScheme)
         .onAppear {
             searchFocused = true
         }
@@ -49,16 +52,9 @@ struct ClipboardPanelView: View {
                     .buttonStyle(.plain)
                 }
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 7)
-            .background(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(Color.primary.opacity(0.05))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .strokeBorder(Color.white.opacity(0.18), lineWidth: 0.8)
-            )
+            .padding(.horizontal, 11)
+            .padding(.vertical, 8)
+            .liquidGlassControl(cornerRadius: 12, isActive: searchFocused)
 
             // 快捷类型筛选药丸
             HStack {
@@ -67,11 +63,13 @@ struct ClipboardPanelView: View {
                         filterPill(filter)
                     }
                 }
-                .padding(2.5)
-                .background(Color.primary.opacity(0.04))
-                .clipShape(Capsule())
+                .padding(3)
+                .background(
+                    Capsule()
+                        .fill(Color(nsColor: .controlBackgroundColor).opacity(colorScheme == .dark ? 0.22 : 0.38))
+                )
                 .overlay(
-                    Capsule().strokeBorder(Color.white.opacity(0.12), lineWidth: 0.6)
+                    Capsule().strokeBorder(LiquidGlassStyle.cardRimStroke(for: colorScheme), lineWidth: 0.65)
                 )
 
                 Spacer()
@@ -100,8 +98,10 @@ struct ClipboardPanelView: View {
                 ZStack {
                     if isSelected {
                         Capsule()
-                            .fill(Color.primary.opacity(0.12))
-                        LiquidGlassStyle.surfaceGloss
+                            .fill(Color.accentColor.opacity(colorScheme == .dark ? 0.24 : 0.15))
+                        Capsule()
+                            .fill(Color(nsColor: .controlBackgroundColor).opacity(0.32))
+                        LiquidGlassStyle.surfaceGloss(for: colorScheme)
                     }
                 }
                 .animation(.easeInOut(duration: 0.15), value: isSelected)
@@ -110,7 +110,7 @@ struct ClipboardPanelView: View {
             .overlay(
                 Capsule()
                     .strokeBorder(
-                        isSelected ? Color.white.opacity(0.28) : Color.clear,
+                        isSelected ? Color.accentColor.opacity(0.45) : Color.clear,
                         lineWidth: 0.8
                     )
             )
@@ -123,17 +123,7 @@ struct ClipboardPanelView: View {
 
     private var liquidDivider: some View {
         Rectangle()
-            .fill(
-                LinearGradient(
-                    colors: [
-                        Color.white.opacity(0.04),
-                        Color.white.opacity(0.24),
-                        Color.white.opacity(0.04)
-                    ],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                )
-            )
+            .fill(LiquidGlassStyle.divider(for: colorScheme))
             .frame(height: 1)
     }
 
@@ -172,21 +162,16 @@ struct ClipboardPanelView: View {
         VStack(spacing: 12) {
             ZStack {
                 Circle()
-                    .fill(Color.primary.opacity(0.04))
-                    .frame(width: 64, height: 64)
+                    .fill(Color(nsColor: .controlBackgroundColor).opacity(colorScheme == .dark ? 0.24 : 0.42))
+                    .frame(width: 70, height: 70)
                     .overlay(
-                        Circle().strokeBorder(Color.white.opacity(0.2), lineWidth: 1)
+                        Circle().strokeBorder(LiquidGlassStyle.rimStrokeGradient(for: colorScheme), lineWidth: 0.9)
                     )
+                    .shadow(color: Color.accentColor.opacity(0.10), radius: 14, y: 4)
 
                 Image(systemName: "doc.on.clipboard")
-                    .font(.system(size: 26, weight: .light))
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [Color.blue.opacity(0.8), Color.purple.opacity(0.7)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
+                    .font(.system(size: 28, weight: .light))
+                    .foregroundStyle(LiquidGlassStyle.accentGradient)
             }
 
             VStack(spacing: 4) {
@@ -225,20 +210,21 @@ struct ClipboardPanelView: View {
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
-            .background(Color.primary.opacity(0.04))
-            .clipShape(Capsule())
+            .background(
+                Capsule()
+                    .fill(Color(nsColor: .controlBackgroundColor).opacity(colorScheme == .dark ? 0.22 : 0.38))
+            )
             .overlay(
-                Capsule().strokeBorder(Color.white.opacity(0.12), lineWidth: 0.6)
+                Capsule().strokeBorder(LiquidGlassStyle.cardRimStroke(for: colorScheme), lineWidth: 0.6)
             )
 
             Button {
                 model.togglePause()
             } label: {
-                Image(systemName: model.paused ? "play.circle.fill" : "pause.circle")
-                    .font(.system(size: 13))
+                Image(systemName: model.paused ? "play.fill" : "pause.fill")
                     .foregroundStyle(model.paused ? Color.green : Color.secondary)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(LiquidGlassIconButtonStyle())
             .help(model.paused ? "恢复记录" : "暂停记录")
 
             Spacer()
@@ -248,34 +234,20 @@ struct ClipboardPanelView: View {
                 model.clearAll()
             } label: {
                 Text("清空")
-                    .font(.system(size: 11, weight: .regular))
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3.5)
-                    .background(Color.primary.opacity(0.03))
-                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .strokeBorder(Color.white.opacity(0.1), lineWidth: 0.6)
-                    )
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.primary.opacity(0.86))
             }
-            .buttonStyle(.plain)
+            .buttonStyle(LiquidGlassButtonStyle())
+
+            AppearanceModeButton(store: store)
 
             // 切换到进程列表
             Button {
                 model.switchToRunningApps()
             } label: {
                 Image(systemName: "macwindow.on.rectangle")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
-                    .padding(5)
-                    .background(Color.primary.opacity(0.04))
-                    .clipShape(Circle())
-                    .overlay(
-                        Circle().strokeBorder(Color.white.opacity(0.15), lineWidth: 0.6)
-                    )
             }
-            .buttonStyle(.plain)
+            .buttonStyle(LiquidGlassIconButtonStyle())
             .help("切换到进程列表")
             .accessibilityLabel("切换到进程列表")
 
@@ -284,16 +256,8 @@ struct ClipboardPanelView: View {
                 model.openSettings()
             } label: {
                 Image(systemName: "gearshape.fill")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
-                    .padding(5)
-                    .background(Color.primary.opacity(0.04))
-                    .clipShape(Circle())
-                    .overlay(
-                        Circle().strokeBorder(Color.white.opacity(0.15), lineWidth: 0.6)
-                    )
             }
-            .buttonStyle(.plain)
+            .buttonStyle(LiquidGlassIconButtonStyle())
             .help("设置")
         }
         .padding(.horizontal, 12)
@@ -304,6 +268,7 @@ struct ClipboardPanelView: View {
 // MARK: - 剪贴板条目行 (液态玻璃卡片)
 
 private struct ClipRow: View {
+    @Environment(\.colorScheme) private var colorScheme
     let item: ClipboardStore.Item
     /// 延迟到渲染时再解码，配合 model 内的缓存
     let thumbnail: () -> NSImage?
@@ -321,7 +286,7 @@ private struct ClipRow: View {
                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                 .overlay(
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .strokeBorder(Color.white.opacity(0.2), lineWidth: 0.6)
+                        .strokeBorder(LiquidGlassStyle.cardRimStroke(for: colorScheme), lineWidth: 0.6)
                 )
 
             // 文本内容与元数据
@@ -400,27 +365,30 @@ private struct ClipRow: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             ZStack {
+                RoundedRectangle(cornerRadius: 11, style: .continuous)
+                    .fill(
+                        Color(nsColor: .controlBackgroundColor)
+                            .opacity(colorScheme == .dark ? (hovered ? 0.34 : 0.15) : (hovered ? 0.60 : 0.26))
+                    )
                 if hovered {
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(Color.primary.opacity(0.065))
-                    LiquidGlassStyle.surfaceGloss
+                    RoundedRectangle(cornerRadius: 11, style: .continuous)
+                        .fill(Color.accentColor.opacity(0.065))
+                    LiquidGlassStyle.surfaceGloss(for: colorScheme)
                 } else if item.pinned {
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(Color.orange.opacity(0.04))
+                    RoundedRectangle(cornerRadius: 11, style: .continuous)
+                        .fill(Color.orange.opacity(0.055))
                 }
             }
         )
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
         .overlay(
-            Group {
-                if hovered {
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .strokeBorder(LiquidGlassStyle.cardRimStroke, lineWidth: 0.8)
-                } else if item.pinned {
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .strokeBorder(Color.orange.opacity(0.25), lineWidth: 0.8)
-                }
-            }
+            RoundedRectangle(cornerRadius: 11, style: .continuous)
+                .strokeBorder(
+                    item.pinned && !hovered
+                        ? LinearGradient(colors: [Color.orange.opacity(0.38), Color.orange.opacity(0.12)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                        : (hovered ? LiquidGlassStyle.rimStrokeGradient(for: colorScheme) : LiquidGlassStyle.cardRimStroke(for: colorScheme)),
+                    lineWidth: hovered || item.pinned ? 0.85 : 0.55
+                )
         )
         .contentShape(Rectangle())
         .onHover { onHoverChange($0) }
@@ -447,7 +415,7 @@ private struct ClipRow: View {
                         startPoint: .top,
                         endPoint: .bottom
                     )
-                    LiquidGlassStyle.surfaceGloss
+                    LiquidGlassStyle.surfaceGloss(for: colorScheme)
                     Image(systemName: "photo.fill")
                         .font(.system(size: 14))
                         .foregroundStyle(.white)
@@ -460,7 +428,7 @@ private struct ClipRow: View {
                     startPoint: .top,
                     endPoint: .bottom
                 )
-                LiquidGlassStyle.surfaceGloss
+                LiquidGlassStyle.surfaceGloss(for: colorScheme)
                 Image(systemName: "folder.fill")
                     .font(.system(size: 14))
                     .foregroundStyle(.white)
@@ -472,7 +440,7 @@ private struct ClipRow: View {
                     startPoint: .top,
                     endPoint: .bottom
                 )
-                LiquidGlassStyle.surfaceGloss
+                LiquidGlassStyle.surfaceGloss(for: colorScheme)
                 Image(systemName: "doc.text.fill")
                     .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(.white)

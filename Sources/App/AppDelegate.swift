@@ -105,6 +105,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if let mode = ProcessInfo.processInfo.environment["CLIPSTATS_DIAG_APPEARANCE"] {
             store.set { settings in
                 switch mode {
+                case "dark":
+                    settings.interfaceAppearance = .dark
+                case "light":
+                    settings.interfaceAppearance = .light
                 case "solid":
                     settings.appearance.backgroundStyle = .solid
                     settings.appearance.backgroundOpacity = 0.9
@@ -370,6 +374,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         statusBar.applySettings()
         panelController.applyHeight(CGFloat(settings.clipboardPanelHeight))
+
+        if previous == nil || previous?.interfaceAppearance != settings.interfaceAppearance {
+            panelController.applyAppearance(settings.interfaceAppearance)
+            appsController.applyAppearance(settings.interfaceAppearance)
+            settingsWindow?.applyAppearance(settings.interfaceAppearance)
+        }
 
         let metricsChanged = previous == nil
             || previous?.metricsInterval != settings.metricsInterval

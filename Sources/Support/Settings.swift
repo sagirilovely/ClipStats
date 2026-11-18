@@ -125,6 +125,22 @@ enum TemperatureMode: String, Codable, CaseIterable, Identifiable {
 
 // MARK: - 外观
 
+enum InterfaceAppearance: String, Codable, CaseIterable, Identifiable {
+    case system = "跟随系统"
+    case light = "浅色"
+    case dark = "夜览"
+
+    var id: String { rawValue }
+
+    var icon: String {
+        switch self {
+        case .system: return "circle.lefthalf.filled"
+        case .light: return "sun.max.fill"
+        case .dark: return "moon.stars.fill"
+        }
+    }
+}
+
 enum BarBackgroundStyle: String, Codable, CaseIterable, Identifiable {
     case none = "无"
     case solid = "纯色"
@@ -215,6 +231,8 @@ struct AppSettings: Codable {
 
     // 外观
     var appearance: BarAppearance = BarAppearance()
+    /// 面板与设置窗口的界面主题，不影响状态栏自定义颜色
+    var interfaceAppearance: InterfaceAppearance = .system
 
     // 采样
     var metricsInterval: Double = 1.0
@@ -246,6 +264,7 @@ struct AppSettings: Codable {
         stabilizeBarWidth = (try? c.decodeIfPresent(Bool.self, forKey: .stabilizeBarWidth)) ?? d.stabilizeBarWidth
         networkVertical = (try? c.decodeIfPresent(Bool.self, forKey: .networkVertical)) ?? d.networkVertical
         appearance = (try? c.decodeIfPresent(BarAppearance.self, forKey: .appearance)) ?? d.appearance
+        interfaceAppearance = (try? c.decodeIfPresent(InterfaceAppearance.self, forKey: .interfaceAppearance)) ?? d.interfaceAppearance
         metricsInterval = (try? c.decodeIfPresent(Double.self, forKey: .metricsInterval)) ?? d.metricsInterval
         thermalInterval = (try? c.decodeIfPresent(Double.self, forKey: .thermalInterval)) ?? d.thermalInterval
         clipboardPollInterval = (try? c.decodeIfPresent(Double.self, forKey: .clipboardPollInterval)) ?? d.clipboardPollInterval

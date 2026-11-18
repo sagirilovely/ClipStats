@@ -64,6 +64,7 @@ ClipStats 是一款专为 macOS 打造的高性能、低资源占用的常驻菜
 #### 3. 极简优雅的设置系统
 - 外观、状态栏模块、刷新频率、剪贴板上限、快捷键等六大独立面板。
 - 字体尺寸（10–16pt）、图标大小、左右边距、列间距、数值对齐（居中 / 靠右）毫米级微调。
+- **液态玻璃与夜览模式**：统一的半透明玻璃层级、环境光泽与自适应高光；支持「跟随系统 / 浅色 / 夜览」，面板内可快捷切换并持久化偏好，状态栏自定义颜色不受影响。
 
 ---
 
@@ -306,6 +307,7 @@ ClipStats is an ultra-lightweight, high-performance macOS menu bar companion eng
 #### 3. Granular Configuration Suite
 - Six dedicated preference sections: Status Bar, Appearance, Refresh Rates, Clipboard, Hotkeys, and About.
 - Fine-grained typography controls (10–16pt font sizes), custom icon point sizes, edge paddings, segment spacing, and slot alignment (center/trailing).
+- **Liquid Glass & Night Mode**: Consistent translucent layers, ambient color, and adaptive highlights. Choose System / Light / Night, switch instantly from either panel, and keep custom menu-bar colors unchanged.
 
 ---
 

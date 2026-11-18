@@ -11,14 +11,25 @@ final class ClipboardPanelController: NSObject, NSWindowDelegate {
     private var panel: ClipboardPanel?
     private var globalMonitor: Any?
     private var localMonitor: Any?
+    private let store: SettingsStore
 
     var onVisibilityChange: ((Bool) -> Void)?
     var panelHeight: CGFloat = 470
 
     private let panelWidth: CGFloat = 390
 
+    init(store: SettingsStore = .shared) {
+        self.store = store
+        super.init()
+    }
+
+    func applyAppearance(_ mode: InterfaceAppearance) {
+        panel?.appearance = mode.nsAppearance
+    }
+
     func show(anchor: NSRect) {
         let panel = ensurePanel()
+        panel.appearance = store.settings.interfaceAppearance.nsAppearance
         if model.searchText.isEmpty {
             model.reload()
         } else {
@@ -91,7 +102,7 @@ final class ClipboardPanelController: NSObject, NSWindowDelegate {
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         panel.delegate = self
         model.panelHeight = panelHeight
-        let hosting = NSHostingController(rootView: ClipboardPanelView(model: model))
+        let hosting = NSHostingController(rootView: ClipboardPanelView(model: model, store: store))
         hosting.view.frame = NSRect(x: 0, y: 0, width: panelWidth, height: panelHeight)
         hosting.view.wantsLayer = true
         hosting.view.layer?.backgroundColor = NSColor.clear.cgColor

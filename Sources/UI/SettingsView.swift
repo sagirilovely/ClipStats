@@ -4,6 +4,7 @@ import AppKit
 struct SettingsView: View {
     @ObservedObject var store: SettingsStore
     @ObservedObject var viewModel: SettingsViewModel
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         VStack(spacing: 0) {
@@ -12,14 +13,8 @@ struct SettingsView: View {
             contentArea
         }
         .frame(width: 760, height: 620)
-        .background(
-            ZStack {
-                // 底层桌面毛玻璃
-                VisualEffectView(material: .sidebar, blendingMode: .behindWindow, state: .active)
-                Color(nsColor: .windowBackgroundColor).opacity(0.35)
-                LiquidGlassStyle.surfaceGloss
-            }
-        )
+        .background(GlassBackdrop(material: .underWindowBackground))
+        .preferredColorScheme(store.settings.interfaceAppearance.colorScheme)
         .onAppear { viewModel.refreshCount() }
         .onDisappear { viewModel.stopRecording() }
     }
@@ -31,21 +26,16 @@ struct SettingsView: View {
             // 应用徽标与标题
             HStack(spacing: 8) {
                 ZStack {
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: [Color.blue.opacity(0.85), Color.purple.opacity(0.85)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .frame(width: 22, height: 22)
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .fill(LiquidGlassStyle.accentGradient)
+                        .frame(width: 26, height: 26)
                         .overlay(
-                            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                .strokeBorder(Color.white.opacity(0.3), lineWidth: 0.8)
+                            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                                .strokeBorder(Color.white.opacity(0.42), lineWidth: 0.7)
                         )
+                        .shadow(color: Color.blue.opacity(0.20), radius: 5, y: 2)
                     Image(systemName: "doc.on.clipboard.fill")
-                        .font(.system(size: 11, weight: .bold))
+                        .font(.system(size: 12, weight: .bold))
                         .foregroundStyle(.white)
                 }
 
@@ -62,10 +52,12 @@ struct SettingsView: View {
                 }
             }
             .padding(3)
-            .background(Color.primary.opacity(0.04))
-            .clipShape(Capsule())
+            .background(
+                Capsule()
+                    .fill(Color(nsColor: .controlBackgroundColor).opacity(colorScheme == .dark ? 0.25 : 0.42))
+            )
             .overlay(
-                Capsule().strokeBorder(Color.white.opacity(0.16), lineWidth: 0.8)
+                Capsule().strokeBorder(LiquidGlassStyle.cardRimStroke(for: colorScheme), lineWidth: 0.7)
             )
 
             Spacer()
@@ -93,8 +85,10 @@ struct SettingsView: View {
                 ZStack {
                     if isSelected {
                         Capsule()
-                            .fill(Color.primary.opacity(0.12))
-                        LiquidGlassStyle.surfaceGloss
+                            .fill(Color.accentColor.opacity(colorScheme == .dark ? 0.25 : 0.16))
+                        Capsule()
+                            .fill(Color(nsColor: .controlBackgroundColor).opacity(0.34))
+                        LiquidGlassStyle.surfaceGloss(for: colorScheme)
                     }
                 }
             )
@@ -102,7 +96,7 @@ struct SettingsView: View {
             .overlay(
                 Capsule()
                     .strokeBorder(
-                        isSelected ? Color.white.opacity(0.28) : Color.clear,
+                        isSelected ? Color.accentColor.opacity(0.48) : Color.clear,
                         lineWidth: 0.8
                     )
             )
@@ -113,17 +107,7 @@ struct SettingsView: View {
 
     private var liquidDivider: some View {
         Rectangle()
-            .fill(
-                LinearGradient(
-                    colors: [
-                        Color.white.opacity(0.02),
-                        Color.white.opacity(0.22),
-                        Color.white.opacity(0.02)
-                    ],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                )
-            )
+            .fill(LiquidGlassStyle.divider(for: colorScheme))
             .frame(height: 1)
     }
 
@@ -338,6 +322,20 @@ struct SettingsView: View {
     private var appearanceTab: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
+                GlassCard(title: "界面主题", icon: "circle.lefthalf.filled", tint: .indigo) {
+                    VStack(alignment: .leading, spacing: 11) {
+                        HStack(spacing: 10) {
+                            ForEach(InterfaceAppearance.allCases) { mode in
+                                interfaceThemeButton(mode)
+                            }
+                            Spacer()
+                        }
+                        Text("夜览模式使用深色玻璃材质；面板右上角或底部的主题按钮可快速切换。状态栏自定义颜色保持不变。")
+                            .font(.system(size: 10.5))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
                 GlassCard(title: "尺寸与布局", icon: "ruler.fill", tint: .purple) {
                     VStack(alignment: .leading, spacing: 12) {
                         sliderRow("字号大小", value: binding(\.barFontSize), range: 10...16, step: 1, suffix: "pt")
@@ -428,6 +426,28 @@ struct SettingsView: View {
             }
             .padding(18)
         }
+    }
+
+    private func interfaceThemeButton(_ mode: InterfaceAppearance) -> some View {
+        let isSelected = store.settings.interfaceAppearance == mode
+        return Button {
+            store.set { $0.interfaceAppearance = mode }
+        } label: {
+            HStack(spacing: 7) {
+                Image(systemName: mode.icon)
+                    .font(.system(size: 12, weight: .medium))
+                Text(mode.rawValue)
+                    .font(.system(size: 11.5, weight: isSelected ? .semibold : .regular))
+                if isSelected {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 8, weight: .bold))
+                }
+            }
+            .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
+            .frame(width: 112, height: 32)
+            .liquidGlassControl(cornerRadius: 10, isActive: isSelected)
+        }
+        .buttonStyle(.plain)
     }
 
     private func sliderRow(_ title: String, value: Binding<Double>, range: ClosedRange<Double>,
@@ -816,19 +836,8 @@ private struct GlassCard<Content: View>: View {
 
             content()
         }
-        .padding(14)
-        .background(
-            ZStack {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(Color.primary.opacity(0.035))
-                LiquidGlassStyle.surfaceGloss
-            }
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(LiquidGlassStyle.cardRimStroke, lineWidth: 0.8)
-        )
+        .padding(15)
+        .liquidGlassCard(cornerRadius: 14)
     }
 }
 

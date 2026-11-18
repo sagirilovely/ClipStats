@@ -14,8 +14,18 @@ final class RunningAppsPanelController: NSObject, NSWindowDelegate {
     private var globalMonitor: Any?
     private var localMonitor: Any?
     private var refreshTimer: Timer?
+    private let store: SettingsStore
 
     var onVisibilityChange: ((Bool) -> Void)?
+
+    init(store: SettingsStore = .shared) {
+        self.store = store
+        super.init()
+    }
+
+    func applyAppearance(_ mode: InterfaceAppearance) {
+        panel?.appearance = mode.nsAppearance
+    }
 
     private var panelWidth: CGFloat { RunningAppsPanelView.panelSize.width }
     private var panelHeight: CGFloat { RunningAppsPanelView.panelSize.height }
@@ -35,6 +45,7 @@ final class RunningAppsPanelController: NSObject, NSWindowDelegate {
 
     func show(anchor: NSRect) {
         let panel = ensurePanel()
+        panel.appearance = store.settings.interfaceAppearance.nsAppearance
         if !isVisible {
             previousApp = NSWorkspace.shared.frontmostApplication
         }
@@ -110,7 +121,7 @@ final class RunningAppsPanelController: NSObject, NSWindowDelegate {
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         panel.delegate = self
 
-        let hosting = NSHostingController(rootView: RunningAppsPanelView(model: model))
+        let hosting = NSHostingController(rootView: RunningAppsPanelView(model: model, store: store))
         hosting.view.frame = NSRect(x: 0, y: 0, width: panelWidth, height: panelHeight)
         panel.contentViewController = hosting
         panel.setContentSize(NSSize(width: panelWidth, height: panelHeight))
