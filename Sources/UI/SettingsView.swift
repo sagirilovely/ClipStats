@@ -124,9 +124,15 @@ struct SettingsView: View {
 
             Spacer()
 
-            Toggle("图标", isOn: binding(\.segments[index].showIcon))
-                .toggleStyle(.checkbox)
-                .controlSize(.small)
+            Picker("", selection: binding(\.segments[index].labelMode)) {
+                ForEach(SegmentLabelMode.allCases) { mode in
+                    Text(mode.rawValue).tag(mode)
+                }
+            }
+            .labelsHidden()
+            .pickerStyle(.menu)
+            .frame(width: 76)
+
             Toggle("数值", isOn: binding(\.segments[index].showText))
                 .toggleStyle(.checkbox)
                 .controlSize(.small)
@@ -153,8 +159,13 @@ struct SettingsView: View {
             HStack(spacing: 12) {
                 ForEach(store.settings.segments.filter { $0.enabled }) { segment in
                     HStack(spacing: 4) {
-                        if segment.showIcon {
+                        switch segment.labelMode {
+                        case .symbol:
                             Image(systemName: segment.kind.symbolName).font(.system(size: 10))
+                        case .text:
+                            Text(segment.kind.textLabel).font(.system(size: 10.5))
+                        case .none:
+                            EmptyView()
                         }
                         if segment.showText {
                             Text(sampleText(segment.kind))
@@ -177,7 +188,7 @@ struct SettingsView: View {
         case .gpu: return "48%"
         case .memory: return "68%"
         case .thermal: return "62°"
-        case .network: return "↓1.2M ↑86K"
+        case .network: return store.settings.networkVertical ? "↑86K\n↓1.2M" : "↓1.2M ↑86K"
         case .clipboard: return "36"
         }
     }
@@ -201,6 +212,21 @@ struct SettingsView: View {
                     .pickerStyle(.segmented)
                     .labelsHidden()
                     .frame(width: 160)
+                    Spacer()
+                }
+
+                HStack(spacing: 10) {
+                    Text("网速布局").font(.system(size: 12)).frame(width: 72, alignment: .leading)
+                    Picker("", selection: binding(\.networkVertical)) {
+                        Text("左右").tag(false)
+                        Text("上下").tag(true)
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .frame(width: 160)
+                    Text("上下排列（上传在上、下载在下）更省宽度")
+                        .font(.system(size: 10.5))
+                        .foregroundStyle(.secondary)
                     Spacer()
                 }
 

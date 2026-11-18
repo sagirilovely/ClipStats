@@ -30,6 +30,18 @@ enum SegmentKind: String, CaseIterable, Codable, Identifiable, Hashable {
         }
     }
 
+    /// 文字标签模式下显示的名字
+    var textLabel: String {
+        switch self {
+        case .cpu: return "CPU"
+        case .gpu: return "GPU"
+        case .memory: return "内存"
+        case .thermal: return "温度"
+        case .network: return "网速"
+        case .clipboard: return "剪贴板"
+        }
+    }
+
     var detail: String {
         switch self {
         case .cpu: return "处理器占用，可附带温度"
@@ -42,13 +54,56 @@ enum SegmentKind: String, CaseIterable, Codable, Identifiable, Hashable {
     }
 }
 
+enum SegmentLabelMode: String, Codable, CaseIterable, Identifiable {
+    case symbol = "图标"
+    case text = "文字"
+    case none = "无"
+    var id: String { rawValue }
+}
+
 struct SegmentConfig: Codable, Identifiable, Hashable {
     var kind: SegmentKind
     var enabled: Bool = true
-    var showIcon: Bool = true
     var showText: Bool = true
+    /// 数值前的标识：SF Symbol 图标 / 文字标签 / 不显示
+    var labelMode: SegmentLabelMode = .symbol
 
     var id: String { kind.rawValue }
+
+    init(kind: SegmentKind, enabled: Bool = true, showText: Bool = true,
+         labelMode: SegmentLabelMode = .symbol) {
+        self.kind = kind
+        self.enabled = enabled
+        self.showText = showText
+        self.labelMode = labelMode
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case kind, enabled, showText, labelMode
+        /// 旧版本字段，仅用于迁移
+        case showIcon
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        kind = try container.decode(SegmentKind.self, forKey: .kind)
+        enabled = (try? container.decodeIfPresent(Bool.self, forKey: .enabled)) ?? true
+        showText = (try? container.decodeIfPresent(Bool.self, forKey: .showText)) ?? true
+        if let mode = try? container.decodeIfPresent(SegmentLabelMode.self, forKey: .labelMode) {
+            labelMode = mode
+        } else {
+            let showIcon = (try? container.decodeIfPresent(Bool.self, forKey: .showIcon)) ?? true
+            labelMode = showIcon ? .symbol : .none
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(kind, forKey: .kind)
+        try container.encode(enabled, forKey: .enabled)
+        try container.encode(showText, forKey: .showText)
+        try container.encode(labelMode, forKey: .labelMode)
+    }
 
     static var defaults: [SegmentConfig] {
         [
@@ -155,6 +210,9 @@ struct AppSettings: Codable {
     /// 固定每个模块的槽位宽度，避免数值跳动时菜单栏宽度变化
     var stabilizeBarWidth: Bool = true
 
+    /// 网速模块上下排列（下载在上、上传在下），用于节省横向空间
+    var networkVertical: Bool = false
+
     // 外观
     var appearance: BarAppearance = BarAppearance()
 
@@ -186,6 +244,7 @@ struct AppSettings: Codable {
         barFontSize = (try? c.decodeIfPresent(Double.self, forKey: .barFontSize)) ?? d.barFontSize
         temperatureMode = (try? c.decodeIfPresent(TemperatureMode.self, forKey: .temperatureMode)) ?? d.temperatureMode
         stabilizeBarWidth = (try? c.decodeIfPresent(Bool.self, forKey: .stabilizeBarWidth)) ?? d.stabilizeBarWidth
+        networkVertical = (try? c.decodeIfPresent(Bool.self, forKey: .networkVertical)) ?? d.networkVertical
         appearance = (try? c.decodeIfPresent(BarAppearance.self, forKey: .appearance)) ?? d.appearance
         metricsInterval = (try? c.decodeIfPresent(Double.self, forKey: .metricsInterval)) ?? d.metricsInterval
         thermalInterval = (try? c.decodeIfPresent(Double.self, forKey: .thermalInterval)) ?? d.thermalInterval
@@ -235,9 +294,17 @@ final class SettingsStore: ObservableObject {
     var onChange: ((AppSettings) -> Void)?
 
     private let defaultsKey = "clipstats.settings.v1"
+    /// 允许通过环境变量指定独立的配置域（自检 / 便携运行）
+    private let defaults: UserDefaults
 
     private init() {
-        if let data = UserDefaults.standard.data(forKey: defaultsKey),
+        if let suite = ProcessInfo.processInfo.environment["CLIPSTATS_DEFAULTS_SUITE"],
+           let scoped = UserDefaults(suiteName: suite) {
+            defaults = scoped
+        } else {
+            defaults = .standard
+        }
+        if let data = defaults.data(forKey: defaultsKey),
            var decoded = try? JSONDecoder().decode(AppSettings.self, from: data) {
             decoded.normalize()
             settings = decoded
@@ -248,7 +315,7 @@ final class SettingsStore: ObservableObject {
 
     private func persist() {
         guard let data = try? JSONEncoder().encode(settings) else { return }
-        UserDefaults.standard.set(data, forKey: defaultsKey)
+        defaults.set(data, forKey: defaultsKey)
         onChange?(settings)
     }
 

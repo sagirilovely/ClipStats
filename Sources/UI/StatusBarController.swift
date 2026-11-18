@@ -3,10 +3,15 @@ import AppKit
 // MARK: - 分段
 
 struct StatusSegment {
-    let symbol: String?
-    let text: String
-    /// 预留宽度的参考串（数值变化时不改变栏宽）
-    let template: String
+    enum Label {
+        case symbol(String)
+        case text(String)
+        case none
+    }
+
+    let label: Label
+    let lines: [String]
+    let templates: [String]
 }
 
 // MARK: - 外观配置
@@ -38,7 +43,7 @@ private final class StatusContentView: NSView {
 
 // MARK: - 状态栏视图
 
-/// 自绘状态栏：多段文字 + SF Symbols，固定槽位宽度，可选纯色 / 毛玻璃背景。
+/// 自绘状态栏：多段文字 + SF Symbols 图标或文字标签，支持固定槽位、双行排列、背景样式。
 final class StatusItemView: NSView {
     var style = BarStyle() {
         didSet { applyStyle() }
@@ -70,12 +75,13 @@ final class StatusItemView: NSView {
     private var cachedLayout: [SegmentLayout] = []
 
     private struct SegmentLayout {
-        let symbol: String?
-        let text: String
-        let symbolPart: CGFloat
+        let label: StatusSegment.Label
+        let labelWidth: CGFloat
+        let lines: [String]
+        let lineWidths: [CGFloat]
         let textPart: CGFloat
-        let actualTextWidth: CGFloat
-        var slot: CGFloat { symbolPart + textPart }
+        let font: NSFont
+        var slot: CGFloat { labelWidth + textPart }
     }
 
     // MARK: - 初始化
@@ -100,8 +106,18 @@ final class StatusItemView: NSView {
 
     private var iconSide: CGFloat { max(10, style.iconPointSize + 3) }
 
+    /// 双行排列时使用的字号
+    private var verticalFont: NSFont {
+        let size = min(10, max(8, style.font.pointSize * 0.72))
+        return .monospacedDigitSystemFont(ofSize: size, weight: .regular)
+    }
+
     private var textAttributes: [NSAttributedString.Key: Any] {
         [.font: style.font, .foregroundColor: style.textColor ?? NSColor.labelColor]
+    }
+
+    private func attributes(_ font: NSFont) -> [NSAttributedString.Key: Any] {
+        [.font: font, .foregroundColor: style.textColor ?? NSColor.labelColor]
     }
 
     private func applyStyle() {
@@ -125,27 +141,40 @@ final class StatusItemView: NSView {
 
     // MARK: - 布局
 
-    private func textWidth(_ text: String) -> CGFloat {
+    private func width(_ text: String, font: NSFont) -> CGFloat {
         guard !text.isEmpty else { return 0 }
-        return ceil((text as NSString).size(withAttributes: textAttributes).width)
+        return ceil((text as NSString).size(withAttributes: [.font: font]).width)
+    }
+
+    private func labelWidth(_ label: StatusSegment.Label) -> CGFloat {
+        switch label {
+        case .symbol:
+            return iconSide + 3
+        case .text(let text):
+            return width(text, font: style.font) + 4
+        case .none:
+            return 0
+        }
     }
 
     private func layout(_ segments: [StatusSegment]) -> [SegmentLayout] {
         segments.map { segment in
-            let actual = textWidth(segment.text)
-            let template = textWidth(segment.template)
-            let symbolPart: CGFloat = segment.symbol == nil ? 0 : iconSide + 3
+            let font = segment.lines.count > 1 ? verticalFont : style.font
+            let lineWidths = segment.lines.map { width($0, font: font) }
+            let templateWidths = segment.templates.map { width($0, font: font) }
+            let textPart = max(lineWidths.max() ?? 0, templateWidths.max() ?? 0)
             return SegmentLayout(
-                symbol: segment.symbol,
-                text: segment.text,
-                symbolPart: symbolPart,
-                textPart: max(actual, template),
-                actualTextWidth: actual
+                label: segment.label,
+                labelWidth: labelWidth(segment.label),
+                lines: segment.lines,
+                lineWidths: lineWidths,
+                textPart: textPart,
+                font: font
             )
         }
     }
 
-    private func width(of items: [SegmentLayout]) -> CGFloat {
+    private func totalWidth(of items: [SegmentLayout]) -> CGFloat {
         var total = style.padding * 2
         for (index, item) in items.enumerated() {
             if index > 0 { total += style.spacing }
@@ -156,12 +185,12 @@ final class StatusItemView: NSView {
 
     /// 自检：给定分段时的总宽度
     func measuredWidth(for segments: [StatusSegment]) -> CGFloat {
-        width(of: layout(segments))
+        totalWidth(of: layout(segments))
     }
 
     func rebuildLayout() {
         cachedLayout = layout(segments)
-        let width = width(of: cachedLayout)
+        let width = totalWidth(of: cachedLayout)
         let height = NSStatusBar.system.thickness
         if let statusItem {
             statusItem.length = width
@@ -223,29 +252,68 @@ final class StatusItemView: NSView {
             cachedLayout = layout(segments)
         }
 
-        let attributes = textAttributes
         var x = style.padding
 
         for (index, item) in cachedLayout.enumerated() {
             if index > 0 { x += style.spacing }
 
-            if let symbol = item.symbol {
-                drawSymbol(symbol, at: NSPoint(x: x, y: (bounds.height - iconSide) / 2))
+            switch item.label {
+            case .symbol(let name):
+                drawSymbol(name, at: NSPoint(x: x, y: (bounds.height - iconSide) / 2))
                 x += iconSide + 3
+            case .text(let text):
+                let attrs = attributes(style.font)
+                let size = (text as NSString).size(withAttributes: attrs)
+                (text as NSString).draw(at: NSPoint(x: x, y: (bounds.height - size.height) / 2),
+                                        withAttributes: attrs)
+                x += size.width + 4
+            case .none:
+                break
             }
 
-            if !item.text.isEmpty {
-                let size = (item.text as NSString).size(withAttributes: attributes)
-                let leftover = max(0, item.textPart - item.actualTextWidth)
-                let offset: CGFloat
-                switch style.alignment {
-                case .center: offset = leftover / 2
-                case .trailing: offset = leftover
-                }
-                let origin = NSPoint(x: x + offset, y: (bounds.height - size.height) / 2)
-                (item.text as NSString).draw(at: origin, withAttributes: attributes)
+            if !item.lines.isEmpty {
+                drawLines(item, at: x)
                 x += item.textPart
             }
+        }
+    }
+
+    private func drawLines(_ item: SegmentLayout, at x: CGFloat) {
+        let attrs = attributes(item.font)
+
+        if item.lines.count == 1 {
+            let text = item.lines[0]
+            let size = (text as NSString).size(withAttributes: attrs)
+            let leftover = max(0, item.textPart - item.lineWidths[0])
+            let offset: CGFloat
+            switch style.alignment {
+            case .center: offset = leftover / 2
+            case .trailing: offset = leftover
+            }
+            (text as NSString).draw(at: NSPoint(x: x + offset, y: (bounds.height - size.height) / 2),
+                                    withAttributes: attrs)
+            return
+        }
+
+        // 双行：第一行在上，第二行在下
+        let font = item.font
+        let lineHeight = ceil(font.ascender - font.descender + font.leading)
+        let total = lineHeight * CGFloat(item.lines.count)
+        let startY = max(0, (bounds.height - total) / 2) + 0.5
+
+        for (lineIndex, text) in item.lines.enumerated() {
+            let size = (text as NSString).size(withAttributes: attrs)
+            let leftover = max(0, item.textPart - (item.lineWidths[safe: lineIndex] ?? size.width))
+            let offset: CGFloat
+            switch style.alignment {
+            case .center: offset = leftover / 2
+            case .trailing: offset = leftover
+            }
+            let y = startY + CGFloat(item.lines.count - 1 - lineIndex) * lineHeight
+            (text as NSString).draw(
+                at: NSPoint(x: x + offset, y: y + (lineHeight - size.height) / 2),
+                withAttributes: attrs
+            )
         }
     }
 
@@ -303,6 +371,12 @@ final class StatusItemView: NSView {
 
     override func rightMouseDown(with event: NSEvent) {
         onRightClick?(event)
+    }
+}
+
+private extension Array {
+    subscript(safe index: Int) -> Element? {
+        indices.contains(index) ? self[index] : nil
     }
 }
 
@@ -396,19 +470,29 @@ final class StatusBarController {
 
     func buildSegments(snapshot: MetricsSnapshot, count: Int, settings: AppSettings) -> [StatusSegment] {
         var segments: [StatusSegment] = []
+
         for config in settings.segments where config.enabled {
-            let text = valueText(for: config.kind, snapshot: snapshot, count: count, settings: settings)
-            let template = (config.showText && settings.stabilizeBarWidth)
-                ? templateText(for: config.kind, settings: settings)
-                : ""
-            segments.append(StatusSegment(
-                symbol: config.showIcon ? config.kind.symbolName : nil,
-                text: config.showText ? text : "",
-                template: template
-            ))
+            let label: StatusSegment.Label
+            switch config.labelMode {
+            case .symbol: label = .symbol(config.kind.symbolName)
+            case .text: label = .text(config.kind.textLabel)
+            case .none: label = .none
+            }
+
+            var lines: [String] = []
+            var templates: [String] = []
+            if config.showText {
+                lines = valueLines(for: config.kind, snapshot: snapshot, count: count, settings: settings)
+                if settings.stabilizeBarWidth {
+                    templates = templateLines(for: config.kind, settings: settings)
+                }
+            }
+
+            segments.append(StatusSegment(label: label, lines: lines, templates: templates))
         }
+
         if segments.isEmpty {
-            segments = [StatusSegment(symbol: "chart.bar", text: "", template: "")]
+            segments = [StatusSegment(label: .symbol("chart.bar"), lines: [], templates: [])]
         }
         return segments
     }
@@ -419,45 +503,48 @@ final class StatusBarController {
         return view.measuredWidth(for: segments)
     }
 
-    private func templateText(for kind: SegmentKind, settings: AppSettings) -> String {
+    private func templateLines(for kind: SegmentKind, settings: AppSettings) -> [String] {
         switch kind {
         case .cpu:
-            return settings.showCPUWithTemperature ? "100% 100°" : "100%"
+            return [settings.showCPUWithTemperature ? "100% 100°" : "100%"]
         case .gpu:
-            return "100%"
+            return ["100%"]
         case .memory:
-            return "100%"
+            return ["100%"]
         case .thermal:
-            return "100°"
+            return ["100°"]
         case .network:
             // Fmt.speed 最长输出形如 "84.0K" / "1.15M"（5 个字符），预留同宽
-            return "↓9.99M ↑9.99M"
+            // 上下排列时上传在上、下载在下
+            return settings.networkVertical ? ["↑9.99M", "↓9.99M"] : ["↓9.99M ↑9.99M"]
         case .clipboard:
-            return "999"
+            return ["999"]
         }
     }
 
-    private func valueText(for kind: SegmentKind, snapshot: MetricsSnapshot,
-                           count: Int, settings: AppSettings) -> String {
+    private func valueLines(for kind: SegmentKind, snapshot: MetricsSnapshot,
+                            count: Int, settings: AppSettings) -> [String] {
         switch kind {
         case .cpu:
             var text = Fmt.percent(snapshot.cpu.total)
             if settings.showCPUWithTemperature, let temperature = temperatureValue(settings, snapshot: snapshot) {
                 text += " " + Fmt.temperature(temperature)
             }
-            return text
+            return [text]
         case .gpu:
-            guard let utilization = snapshot.gpu.utilization else { return "--" }
-            return Fmt.percent(utilization)
+            guard let utilization = snapshot.gpu.utilization else { return ["--"] }
+            return [Fmt.percent(utilization)]
         case .memory:
-            return Fmt.percent(snapshot.memory.usage)
+            return [Fmt.percent(snapshot.memory.usage)]
         case .thermal:
-            guard let temperature = temperatureValue(settings, snapshot: snapshot) else { return "--" }
-            return Fmt.temperature(temperature)
+            guard let temperature = temperatureValue(settings, snapshot: snapshot) else { return ["--"] }
+            return [Fmt.temperature(temperature)]
         case .network:
-            return "↓\(Fmt.speed(snapshot.network.download)) ↑\(Fmt.speed(snapshot.network.upload))"
+            let down = "↓\(Fmt.speed(snapshot.network.download))"
+            let up = "↑\(Fmt.speed(snapshot.network.upload))"
+            return settings.networkVertical ? [up, down] : ["\(down) \(up)"]
         case .clipboard:
-            return "\(count)"
+            return ["\(count)"]
         }
     }
 

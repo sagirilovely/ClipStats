@@ -86,6 +86,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     settings.appearance.segmentSpacing = 2
                     settings.appearance.horizontalPadding = 2
                     settings.appearance.iconPointSize = 10
+                case "text":
+                    settings.segments = settings.segments.map { config in
+                        var copy = config
+                        copy.labelMode = .text
+                        return copy
+                    }
+                case "vertical":
+                    settings.networkVertical = true
+                case "labels":
+                    settings.segments = settings.segments.map { config in
+                        var copy = config
+                        copy.labelMode = .text
+                        return copy
+                    }
+                case "textvertical":
+                    settings.networkVertical = true
+                    settings.appearance.segmentSpacing = 4
+                    settings.segments = settings.segments.map { config in
+                        var copy = config
+                        copy.labelMode = .text
+                        return copy
+                    }
                 default:
                     break
                 }
