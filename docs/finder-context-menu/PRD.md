@@ -125,7 +125,15 @@ ClipStats  ▸
   新建文件…                  ← 弹面板，可选路径与类型
 ```
 
-编辑器检测范围：Cursor / VS Code / WebStorm / IntelliJ IDEA / Xcode / Zed / Sublime Text / Nova，**装了几个就列几项**，不做「只显示一个默认编辑器」的限制（用户明确要求）。
+编辑器检测范围（**装了几个就列几项**，最多 16 项）：
+
+| 类别 | 覆盖 |
+| --- | --- |
+| AI IDE | Cursor、Trae（含 CN 版）、CodeBuddy（含 CN 版）、Windsurf、Antigravity、Kiro、Qoder、ZCode |
+| JetBrains 全家桶 | WebStorm、CLion、IntelliJ IDEA（含 CE）、PyCharm、GoLand、PhpStorm、RubyMine、Rider、DataGrip、DataSpell、RustRover、Aqua、Fleet |
+| 其他 | VS Code / Insiders / VSCodium、Xcode、Android Studio、Zed、Sublime Text、Nova、BBEdit、TextMate、Emacs、MacVim、Neovide、Lapce、Eclipse、NetBeans、Qt Creator、HBuilderX、RStudio、Spyder、Visual Studio |
+
+检测策略：**扫 `/Applications` 与 `~/Applications` 读取真实 bundle id**（沙盒内可读），命中不到再按 App 名字兜底（覆盖国内特供版、改名版、bundle id 未知的新 IDE），最后才退回 LaunchServices 查询；结果缓存 5 分钟并在扩展启动时预热。
 
 设计理由：
 
@@ -291,7 +299,7 @@ ClipStats  ▸
 | 1 | 菜单根节点：**`ClipStats`** |
 | 2 | 快捷新建：**只保留 Markdown 一个**，一眼可见；其余类型走「新建文件…」 |
 | 3 | 「新建文件…」面板：**进 P0**；面板内可选**路径**与**文件类型/后缀**，路径默认取触发时的目录；类型用 3×2 网格，底部显示最终文件名预览 |
-| 6 | 编辑器：**已安装的逐个列出**（Cursor / VS Code / WebStorm / IntelliJ IDEA / Xcode / Zed / Sublime Text / Nova），标题统一「由 X 打开」 |
+| 6 | 编辑器：**已安装的逐个列出**（覆盖 AI IDE + JetBrains 全家桶 + 常见编辑器共 40 个识别项，见 §5.1），标题统一「由 X 打开」 |
 | 4 | 设置页分区名：**「集成」** |
 | 5 | 复制路径 / 复制文件名：**整项砍掉**，不重复系统已有能力（`⌥⌘C` / `⌘C`） |
 

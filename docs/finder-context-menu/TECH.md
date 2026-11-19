@@ -54,6 +54,7 @@ Finder ──▶ ClipStatsFinder.appex（沙盒，只读）
 | `Sources/FinderExt/FinderExt.swift` | 已实现 | 扩展：目录监听、菜单构建（多编辑器项）、点击分发、诊断日志 | ~230 行 |
 | `Sources/App/FinderBridge.swift` | 已有（验证版） | 主 App：URL 事件、建文件、开终端、错误映射 | ~95 → ~180 行 |
 | `Sources/UI/FinderHUD.swift` | 待新增 | 不抢焦点的结果提示（nonactivatingPanel + 玻璃样式） | ~120 行 |
+| `Sources/Support/FinderEditors.swift` | 已实现 | 编辑器注册表（主 App 与 appex 共用同一份文件）：扫描 /Applications + 名字兜底 + 缓存 | ~230 行 |
 | `Sources/UI/NewFilePanel.swift` | 已实现 | 「新建文件…」面板（路径 + 文件名 + 类型/自定义后缀 + 回车创建） | ~210 行 |
 | `Sources/Support/FinderActions.swift` | 已实现 | 建文件、重名递增、骨架内容、错误映射、打开终端/编辑器 | ~170 行 |
 | `Sources/UI/FinderExtensionManager.swift` | 已实现 | 扩展状态检测、pluginkit 调用、TCC 探针、重新加载访达 | ~170 行 |
@@ -113,6 +114,8 @@ override func menu(for menuKind: FIMenuKind) -> NSMenu? {
 | --- | --- | --- | --- |
 | 在终端中打开 | 1 | `clipstats://openterminal?dir=…` | 主 App |
 | 由 <编辑器> 打开 | 100 + 编辑器序号 | `clipstats://openfile?path=…&app=<bundleID>` | 主 App |
+
+> 编辑器清单在主 App 与 appex 之间**共用同一个源文件**（`Sources/Support/FinderEditors.swift`，由 `build-appex.sh` 一并编译），避免两边漂移。
 | 新建 Markdown 文件 | 3 | `clipstats://newfile?dir=…&ext=md` | 主 App |
 | 新建文件… | 4 | `clipstats://panel?dir=…` | 主 App（弹面板） |
 
