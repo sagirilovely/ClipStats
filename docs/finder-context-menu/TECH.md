@@ -14,7 +14,7 @@
 | 扩展能直接写文件吗 | **不能** | appex 强制沙盒，写操作 deny(1) file-write-create |
 | 写操作怎么落地 | 主 App（非沙盒）代执行 | 已验证：桌面建文件成功 |
 | 主 App 怎么被唤起 | `clipstats://` URL scheme | 沙盒内 `NSWorkspace.open` 返回 true 且送达 |
-| 复制类要不要走 IPC | **不要** | 扩展内 `NSPasteboard` 直接写，已验证 |
+| 复制功能 | **已砍掉** | 系统 `⌥⌘C` / `⌘C` 已覆盖，不重复实现 |
 | 构建改动 | 3 处 + 1 个脚本 | 验证版已完成 |
 | 签名 | ad-hoc 可用，重建不掉勾 | §9 #11 |
 | 菜单嵌套 | 一层可以；**二级嵌套未验证** | §12 |
@@ -31,8 +31,7 @@
 Finder ──▶ ClipStatsFinder.appex（沙盒，只读）
               │ menu(for:) 构建菜单（只有 title/tag 靠得住）
               │ 点击 → 重新读取 targetedURL / selectedItemURLs
-              ├── 复制类 ──▶ NSPasteboard（本地完成，不依赖主 App）
-              └── 写操作 ──▶ NSWorkspace.open("clipstats://…")
+              └── 全部动作 ──▶ NSWorkspace.open("clipstats://…")
                                    │
                                    ▼
                         ClipStats.app（非沙盒）· FinderBridge
@@ -44,7 +43,7 @@ Finder ──▶ ClipStatsFinder.appex（沙盒，只读）
                         状态栏反馈 + HUD（不抢焦点）
 ```
 
-**分工原则**：能在扩展里做完的（复制）就在扩展里做完；必须落盘的才交给主 App。这样「复制路径」不依赖 App 是否运行。
+**分工原则**：扩展只负责构造菜单与解析路径；所有动作（新建、打开）都需要落盘或启动别的进程，统一交给主 App，避免在沙盒里撞权限墙。
 
 ---
 
@@ -52,10 +51,12 @@ Finder ──▶ ClipStatsFinder.appex（沙盒，只读）
 
 | 文件 | 状态 | 作用 | 预估 |
 | --- | --- | --- | --- |
-| `Sources/FinderExt/FinderExt.swift` | 已有（验证版） | 扩展：目录监听、菜单构建、点击分发、复制、诊断日志 | ~190 → ~230 行 |
+| `Sources/FinderExt/FinderExt.swift` | 已实现 | 扩展：目录监听、菜单构建、点击分发、诊断日志 | ~180 行 |
 | `Sources/App/FinderBridge.swift` | 已有（验证版） | 主 App：URL 事件、建文件、开终端、错误映射 | ~95 → ~180 行 |
 | `Sources/UI/FinderHUD.swift` | 待新增 | 不抢焦点的结果提示（nonactivatingPanel + 玻璃样式） | ~120 行 |
-| `Sources/UI/NewFilePanel.swift` | 待新增 | 「新建文件…」面板（文件名 + 类型 + 回车创建） | ~150 行 |
+| `Sources/UI/NewFilePanel.swift` | 已实现 | 「新建文件…」面板（路径 + 文件名 + 类型/自定义后缀 + 回车创建） | ~210 行 |
+| `Sources/Support/FinderActions.swift` | 已实现 | 建文件、重名递增、骨架内容、错误映射、打开终端/编辑器 | ~170 行 |
+| `Sources/UI/FinderExtensionManager.swift` | 已实现 | 扩展状态检测、pluginkit 调用、TCC 探针、重新加载访达 | ~170 行 |
 | `Sources/UI/SettingsView.swift` | 待改 | 新增「集成」分区（状态卡、一键启用、授权引导） | +~200 行 |
 | `Sources/UI/SettingsViewModel.swift` | 待改 | 扩展状态检测、pluginkit 调用、轮询 | +~80 行 |
 | `Sources/App/AppDelegate.swift` | 已有（验证版） | 挂载 `FinderBridge`、HUD 挂载点 | +~15 行 |
@@ -99,23 +100,23 @@ override func menu(for menuKind: FIMenuKind) -> NSMenu? {
     let selected  = FIFinderSyncController.default().selectedItemURLs() ?? []
     let targeted  = FIFinderSyncController.default().targetedURL()
     let directory = resolveDirectory(selected: selected, targeted: targeted)
-    // 1) 复制类（总是显示，扩展内完成）
-    // 2) 打开类（目录存在时显示；编辑器未安装则整项不出现）
-    // 3) 新建类（放最后）
+    // 1) 打开类（在终端 / 在编辑器；编辑器未安装则整项不出现）
+    // 2) 新建类（放在最下：新建 Markdown 文件 / 新建文件…）
 }
 ```
 
 规则见 PRD §5.2。动态项固定在组末，避免菜单长度抖动。
 
-### 3.4 复制实现（不经过主 App）
+### 3.4 动作清单
 
-```swift
-NSPasteboard.general.clearContents()
-NSPasteboard.general.setString(paths.joined(separator: "\\n"), forType: .string)
-// 之后再尽力发一个「提示」URL 给主 App；失败不影响复制结果
-```
+| 菜单项 | tag | 发出的 URL | 执行方 |
+| --- | --- | --- | --- |
+| 在终端中打开 | 1 | `clipstats://openterminal?dir=…` | 主 App |
+| 在 <编辑器> 中打开 | 2 | `clipstats://openfile?path=…&app=<bundleID>` | 主 App |
+| 新建 Markdown 文件 | 3 | `clipstats://newfile?dir=…&ext=md` | 主 App |
+| 新建文件… | 4 | `clipstats://panel?dir=…` | 主 App（弹面板） |
 
-设计取舍：复制成功仍需提示（剪贴板变化不可见），但提示走「尽力而为」的 URL；即使 App 没运行、提示丢失，复制本身已经成功。
+选择理由：appex 沙盒里只能读路径，任何落盘动作都要主 App 代做；统一走 URL 可以把扩展逻辑压到最薄。
 
 ---
 
@@ -131,7 +132,6 @@ NSPasteboard.general.setString(paths.joined(separator: "\\n"), forType: .string)
 | openfile | path、app（bundle id） | 用指定 App 打开 | 是 |
 | openterminal | dir | 以 dir 为 cwd 打开终端 | 是 |
 | panel | dir | 打开「新建文件…」面板 | 是 |
-| toast | text | 仅显示 HUD 提示（复制成功后用，尽力而为） | 否（丢了无影响） |
 
 约定：
 
@@ -284,7 +284,7 @@ codesign --verify --deep --strict --verbose=2 "$APP"
 | 6 | 点击 → URL → 主 App 建文件 | ✅ | 日志 click: newfile sent=true + 桌面出现文件 |
 | 7 | 重名递增 | ✅ | 未命名.md、未命名 2.md |
 | 8 | .sh shebang + 755 权限 | ✅ | 内容与权限均正确 |
-| 9 | 复制路径（扩展内完成） | ✅ | 日志 click: copy sent=true chars=21 |
+| 9 | ~~复制路径~~ | 需求已砍 | 系统 `⌥⌘C` 覆盖，不再实现 |
 | 10 | 在终端中打开 | ✅ | 终端 cwd 正确 |
 | 11 | 重装后是否掉勾 | ✅ 不掉 | 重装 + killall Finder 后自动出现新的 init 日志 |
 | 12 | 受保护目录 TCC | ✅ 弹一次 | 桌面首次新建时弹「想访问桌面文件夹」 |
