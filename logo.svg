@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-label="ClipStats logo">
+  <defs>
+    <!-- 液态玻璃底：青 → 蓝 → 紫，和 App 内的 accent 渐变同源 -->
+    <linearGradient id="glassBase" x1="0.15" y1="0.05" x2="0.85" y2="0.95">
+      <stop offset="0" stop-color="#7BE0FF"/>
+      <stop offset="0.42" stop-color="#2E8BFF"/>
+      <stop offset="0.78" stop-color="#4C6BFF"/>
+      <stop offset="1" stop-color="#8A6BFF"/>
+    </linearGradient>
+
+    <!-- 顶部镜面高光 -->
+    <linearGradient id="topGloss" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.55"/>
+      <stop offset="0.55" stop-color="#FFFFFF" stop-opacity="0.06"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+
+    <!-- 右下环境辉光 -->
+    <radialGradient id="ambientGlow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#B98BFF" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#B98BFF" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- 外边缘：上亮下暗，模拟玻璃倒角 -->
+    <linearGradient id="rim" x1="0.5" y1="0" x2="0.5" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.85"/>
+      <stop offset="0.45" stop-color="#FFFFFF" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0.55"/>
+    </linearGradient>
+
+    <!-- 剪贴板卡片：白色玻璃，上亮下暗 -->
+    <linearGradient id="card" x1="0.5" y1="0" x2="0.5" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#E4EEFF"/>
+    </linearGradient>
+
+    <!-- 卡片投影 -->
+    <filter id="cardShadow" x="-40%" y="-40%" width="180%" height="180%">
+      <feDropShadow dx="0" dy="26" stdDeviation="30" flood-color="#0B1E63" flood-opacity="0.38"/>
+    </filter>
+
+    <!-- 卡片形状（圆角矩形 + 顶部夹子凸起） -->
+    <clipPath id="clipShape">
+      <rect x="100" y="100" width="824" height="824" rx="186" ry="186"/>
+    </clipPath>
+
+    <!-- 用 mask 把柱状图「挖空」，露出背后的玻璃渐变 -->
+    <mask id="cardCut" maskUnits="userSpaceOnUse" x="0" y="0" width="1024" height="1024">
+      <rect x="0" y="0" width="1024" height="1024" fill="black"/>
+      <rect x="322" y="292" width="380" height="470" rx="78" ry="78" fill="white"/>
+      <rect x="452" y="240" width="120" height="104" rx="44" ry="44" fill="white"/>
+      <rect x="404" y="596" width="60" height="104" rx="30" ry="30" fill="black"/>
+      <rect x="482" y="536" width="60" height="164" rx="30" ry="30" fill="black"/>
+      <rect x="560" y="466" width="60" height="234" rx="30" ry="30" fill="black"/>
+      <rect x="404" y="372" width="216" height="52" rx="26" ry="26" fill="black"/>
+    </mask>
+  </defs>
+
+  <!-- 底板 -->
+  <g clip-path="url(#clipShape)">
+    <rect x="100" y="100" width="824" height="824" fill="url(#glassBase)"/>
+    <circle cx="760" cy="800" r="420" fill="url(#ambientGlow)"/>
+    <ellipse cx="430" cy="170" rx="640" ry="300" fill="url(#topGloss)"/>
+    <!-- 底部微弱反光，避免下半部分发死 -->
+    <ellipse cx="512" cy="968" rx="520" ry="150" fill="#FFFFFF" opacity="0.10"/>
+  </g>
+
+  <!-- 外边缘 -->
+  <rect x="101.5" y="101.5" width="821" height="821" rx="185" ry="185"
+        fill="none" stroke="url(#rim)" stroke-width="3"/>
+
+  <!-- 剪贴板卡片（白玻璃） -->
+  <g filter="url(#cardShadow)">
+    <rect x="322" y="292" width="380" height="470" rx="78" ry="78" fill="url(#card)" mask="url(#cardCut)"/>
+    <rect x="452" y="240" width="120" height="104" rx="44" ry="44" fill="url(#card)"/>
+  </g>
+
+  <!-- 卡片内侧高光 -->
+  <path d="M400 322 H624" stroke="#FFFFFF" stroke-opacity="0.9" stroke-width="10" stroke-linecap="round"/>
+
+  <!-- 右上角小星芒：翻译 / 智能的暗示 -->
+  <g fill="#FFFFFF" opacity="0.92">
+    <path d="M812 268 C818 300 830 312 862 318 C830 324 818 336 812 368 C806 336 794 324 762 318 C794 312 806 300 812 268 Z"/>
+  </g>
+</svg>
