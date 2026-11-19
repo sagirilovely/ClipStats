@@ -283,6 +283,9 @@ struct LiquidGlassPanelModifier: ViewModifier {
     @ViewBuilder
     func body(content: Content) -> some View {
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        // .glassEffect 需要 Xcode 26（Swift 6.2）及以上的 SDK；用旧 SDK 构建（例如 CI 的
+        // macos-15 runner）时必须在编译期整体降级，否则连编译都过不去。
+        #if compiler(>=6.2)
         if #available(macOS 26.0, *), !reduceTransparency {
             // macOS 26+：真正的液态玻璃，折射 / 边缘高光 / 焦点感知都交给系统，
             // 我们只补一条 hairline 保证边界清晰（不再叠第二层玻璃或自定义渐变）。
@@ -295,21 +298,29 @@ struct LiquidGlassPanelModifier: ViewModifier {
                     )
                 )
         } else {
-            content
-                .background(
-                    GlassBackdrop(material: colorScheme == .dark ? .hudWindow : .popover)
-                )
-                .clipShape(shape)
-                .overlay(
-                    shape.strokeBorder(LiquidGlassStyle.rimStrokeGradient(for: colorScheme), lineWidth: 0.9)
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: max(0, cornerRadius - 1), style: .continuous)
-                        .strokeBorder(Color.white.opacity(colorScheme == .dark ? 0.045 : 0.22), lineWidth: 0.5)
-                        .padding(1)
-                )
-            // 浮层阴影由 NSPanel 统一绘制，避免列表滚动时反复离屏合成。
+            legacyBody(content: content, shape: shape)
         }
+        #else
+        legacyBody(content: content, shape: shape)
+        #endif
+    }
+
+    /// macOS 25 及更早 / 旧 SDK：NSVisualEffectView + 自定义描边
+    private func legacyBody(content: Content, shape: RoundedRectangle) -> some View {
+        content
+            .background(
+                GlassBackdrop(material: colorScheme == .dark ? .hudWindow : .popover)
+            )
+            .clipShape(shape)
+            .overlay(
+                shape.strokeBorder(LiquidGlassStyle.rimStrokeGradient(for: colorScheme), lineWidth: 0.9)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: max(0, cornerRadius - 1), style: .continuous)
+                    .strokeBorder(Color.white.opacity(colorScheme == .dark ? 0.045 : 0.22), lineWidth: 0.5)
+                    .padding(1)
+            )
+        // 浮层阴影由 NSPanel 统一绘制，避免列表滚动时反复离屏合成。
     }
 }
 
@@ -424,6 +435,7 @@ struct LiquidGlassIconButtonStyle: ButtonStyle {
 
     @ViewBuilder
     func makeBody(configuration: Configuration) -> some View {
+        #if compiler(>=6.2)
         if #available(macOS 26.0, *), !reduceTransparency {
             // macOS 26 起让按钮自己变成一块可交互的系统玻璃（等价于 .buttonStyle(.glass)，
             // 但保留我们固定的 29×29 圆形尺寸与按下缩放）
@@ -438,6 +450,9 @@ struct LiquidGlassIconButtonStyle: ButtonStyle {
         } else {
             legacyBody(configuration: configuration)
         }
+        #else
+        legacyBody(configuration: configuration)
+        #endif
     }
 
     private func legacyBody(configuration: Configuration) -> some View {

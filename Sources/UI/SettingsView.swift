@@ -23,7 +23,8 @@ struct SettingsView: View {
     /// 玻璃上再压一层很淡的窗口底色，保证长文本的对比度（HIG：可读性优先于质感）。
     @ViewBuilder
     private var settingsWindowBackdrop: some View {
-        #if os(macOS)
+        // 同 LiquidGlass：.glassEffect 只在 Swift 6.2+ 的 SDK 里存在
+        #if os(macOS) && compiler(>=6.2)
         if #available(macOS 26.0, *),
            !NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency {
             ZStack {
