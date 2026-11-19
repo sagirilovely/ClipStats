@@ -20,12 +20,12 @@ SOURCES=$(find Sources -name '*.swift')
 mkdir -p "$BUILD" "$DIST" "$BUILD/mcache"
 
 swiftc -O -swift-version 5 -module-cache-path "$BUILD/mcache" \
-    -target "arm64-apple-${DEPLOY_TARGET}" $SOURCES -o "$BUILD/${APP_NAME}-arm64"
+    -target "arm64-apple-${DEPLOY_TARGET}" -framework FinderSync $SOURCES -o "$BUILD/${APP_NAME}-arm64"
 
 case "$ARCH" in
   universal)
     swiftc -O -swift-version 5 -module-cache-path "$BUILD/mcache" \
-        -target "x86_64-apple-${DEPLOY_TARGET}" $SOURCES -o "$BUILD/${APP_NAME}-x86_64"
+        -target "x86_64-apple-${DEPLOY_TARGET}" -framework FinderSync $SOURCES -o "$BUILD/${APP_NAME}-x86_64"
     lipo -create -output "$BUILD/${APP_NAME}-universal" \
         "$BUILD/${APP_NAME}-arm64" "$BUILD/${APP_NAME}-x86_64"
     BIN="$BUILD/${APP_NAME}-universal"
@@ -35,7 +35,7 @@ case "$ARCH" in
     ;;
   x86_64)
     swiftc -O -swift-version 5 -module-cache-path "$BUILD/mcache" \
-        -target "x86_64-apple-${DEPLOY_TARGET}" $SOURCES -o "$BUILD/${APP_NAME}-x86_64"
+        -target "x86_64-apple-${DEPLOY_TARGET}" -framework FinderSync $SOURCES -o "$BUILD/${APP_NAME}-x86_64"
     BIN="$BUILD/${APP_NAME}-x86_64"
     ;;
   *)
@@ -49,6 +49,15 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/$APP_NAME"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
 [ -f Resources/AppIcon.icns ] && cp Resources/AppIcon.icns "$APP/Contents/Resources/"
+
+# 访达扩展：编译 → 装配 → 先签内层（顺序反了外层密封会失效）
+APPEX_NAME="ClipStatsFinder"
+APPEX="$APP/Contents/PlugIns/$APPEX_NAME.appex"
+./scripts/build-appex.sh "$ARCH" "$BUILD/appex/$APPEX_NAME"
+mkdir -p "$APPEX/Contents/MacOS"
+cp "$BUILD/appex/$APPEX_NAME" "$APPEX/Contents/MacOS/$APPEX_NAME"
+cp Resources/FinderExt-Info.plist "$APPEX/Contents/Info.plist"
+codesign --force --sign - --timestamp=none --entitlements Resources/FinderExt.entitlements "$APPEX"
 
 # ad-hoc 签名（没有开发者证书也能本机运行）
 codesign --force --sign - --timestamp=none "$APP"

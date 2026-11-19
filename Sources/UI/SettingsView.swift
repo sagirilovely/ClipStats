@@ -5,6 +5,7 @@ struct SettingsView: View {
     @ObservedObject var store: SettingsStore
     @ObservedObject var viewModel: SettingsViewModel
     @ObservedObject private var updateChecker = UpdateChecker.shared
+    @ObservedObject private var finderManager = FinderExtensionManager.shared
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
@@ -16,7 +17,10 @@ struct SettingsView: View {
         .frame(width: 760, height: 620)
         .background { settingsWindowBackdrop }
         .preferredColorScheme(store.settings.interfaceAppearance.colorScheme)
-        .onAppear { viewModel.refreshCount() }
+        .onAppear {
+            viewModel.refreshCount()
+            finderManager.refresh()
+        }
         .onDisappear { viewModel.stopRecording() }
     }
 
@@ -94,6 +98,8 @@ struct SettingsView: View {
                     .font(.system(size: 10.5))
                 Text(tab.rawValue)
                     .font(.system(size: 11.5, weight: isSelected ? .medium : .regular))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
@@ -139,6 +145,7 @@ struct SettingsView: View {
         case .sampling: samplingTab
         case .clipboard: clipboardTab
         case .hotkey: hotkeyTab
+        case .integration: integrationTab
         case .about: aboutTab
         }
     }
@@ -749,7 +756,110 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - 关于页签
+    // MARK: - 集成页签
+
+    private static func integrationStatusColor(_ status: FinderExtensionManager.Status) -> Color {
+        switch status {
+        case .enabled: return .green
+        case .unregistered: return .orange
+        case .disabled, .unknown: return Color.secondary.opacity(0.4)
+        }
+    }
+
+    private static let integrationTimeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm:ss"
+        return formatter
+    }()
+
+    private var integrationTab: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                GlassCard(title: "访达右键扩展", icon: "puzzlepiece.extension.fill", tint: .blue) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack(spacing: 8) {
+                            Circle()
+                                .fill(Self.integrationStatusColor(finderManager.status))
+                                .frame(width: 8, height: 8)
+                            Text(finderManager.statusText)
+                                .font(.system(size: 12.5, weight: .medium))
+                            Spacer()
+                            if let checked = finderManager.lastChecked {
+                                Text("上次检测 " + Self.integrationTimeFormatter.string(from: checked))
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+
+                        Text("启用后，在访达右键菜单里会出现「ClipStats」：在终端或编辑器中打开、新建文件。")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+
+                        HStack(spacing: 8) {
+                            Button {
+                                finderManager.openSystemSettings()
+                            } label: {
+                                Text("打开系统设置…").font(.system(size: 11.5, weight: .medium))
+                            }
+                            .buttonStyle(LiquidGlassButtonStyle())
+
+                            Button("重新检测") { finderManager.refreshWithPolling() }
+                                .disabled(finderManager.isWorking)
+
+                            Button("启用扩展") {
+                                finderManager.enableWithPluginkit()
+                                FinderHUDController.shared.showInfo("正在启用访达扩展…")
+                            }
+                            .disabled(finderManager.status == .enabled || finderManager.isWorking)
+
+                            Button("重新加载访达") { finderManager.reloadFinder() }
+                                .disabled(finderManager.isWorking)
+                        }
+                    }
+                }
+
+                GlassCard(title: "文件夹权限", icon: "lock.shield.fill", tint: .orange) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("在桌面、文稿、下载目录新建文件需要授权。可以现在授权，避免第一次右键时被系统拦住。")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+
+                        HStack(spacing: 8) {
+                            Button("授权桌面 / 文稿 / 下载") {
+                                finderManager.requestProtectedFolderAccess()
+                            }
+                            Button("检查状态") { finderManager.refreshWithPolling() }
+                        }
+                    }
+                }
+
+                if finderManager.isSequoia {
+                    GlassCard(title: "macOS 15 特别说明", icon: "exclamationmark.triangle.fill", tint: .yellow) {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("macOS 15 移除了访达扩展的图形开关，macOS 26 起已恢复。可以点上面的「启用扩展」自动完成；失败时复制下面的命令到终端执行。")
+                                .font(.system(size: 11))
+                                .foregroundStyle(.secondary)
+
+                            Text(finderManager.pluginkitCommand)
+                                .font(.system(size: 11, design: .monospaced))
+                                .textSelection(.enabled)
+                                .padding(8)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                    .fill(Color(nsColor: .textBackgroundColor).opacity(0.5)))
+
+                            Button("拷贝命令") {
+                                NSPasteboard.general.clearContents()
+                                NSPasteboard.general.setString(finderManager.pluginkitCommand, forType: .string)
+                                FinderHUDController.shared.showSuccess("命令已拷贝")
+                            }
+                        }
+                    }
+                }
+            }
+            .padding(18)
+        }
+    }
 
     private var aboutTab: some View {
         ScrollView {

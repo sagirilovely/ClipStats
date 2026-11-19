@@ -107,12 +107,19 @@ Mac power users and developers often struggle with two notorious menu bar issues
 - **Zero Accessibility Permissions**: Registered through macOS Carbon `RegisterEventHotKey` (default `⌥⌘V`), ensuring zero keylogging security exposure.
 
 ### 4. 🎨 Liquid Glass Preferences System
-- **6 Focused Preference Tabs**: Status Bar Modules, Appearance, Update Intervals, Clipboard Capacity, Global Hotkeys, and About.
+- **7 Focused Preference Tabs**: Status Bar Modules, Appearance, Update Intervals, Clipboard Capacity, Global Hotkeys, Finder Integration, and About.
 - **Adaptive Appearance**: Instant switching between `Follow System`, `Light`, and `Night (Dark Glass)`.
 - **Automatic Update Check**: Once at launch and every 24 hours the app compares its version with GitHub Releases; a newer build opens a small glass popover with the release notes, and "Download & Install" fetches the dmg and mounts it for a simple drag into Applications.
 - **Pixel-Level Micro Tuning**: Fine-tune font sizes (9–16pt), icon dimensions, horizontal padding (**0–20pt**) and module spacing (**5–20pt**, the 5pt floor still keeps neighbouring segments from touching), plus numeric alignment (Left / Center / Right).
 
-### 5. 🔤 Pocket EN ↔ ZH Mini Translator
+### 5. 🖱 Finder Context Menu
+- **Right where you work**: right-click any folder or file in Finder and a `ClipStats` group appears with **Open in Terminal**, **Open with X**, **New Markdown File**, and **New File…**.
+- **40+ editors auto-detected**: Cursor, Trae (incl. CN build), CodeBuddy (incl. CN build), Windsurf, Antigravity, Qoder, ZCode, WebStorm, CLion, IntelliJ IDEA, PyCharm, GoLand, PhpStorm, Rider, DataGrip, Xcode, Android Studio, VS Code / VSCodium, Zed, Sublime Text, Nova, Emacs, MacVim and more. Whatever is installed is listed — no more digging through the slow native "Open With" list.
+- **New File panel**: pick the destination folder, choose from six types (Markdown / Text / JSON / Python / Shell / custom extension) and see the final filename live. JSON is seeded with `{}`; Python and Shell get a shebang plus the `755` bit; duplicate names auto-increment (`未命名 2.md`) instead of overwriting.
+- **Sandbox-safe by design**: the Finder extension is sandboxed and can only read paths — every write is performed by the resident ClipStats app. Nothing pops a Finder window or steals focus; a small HUD in the top-right corner reports the result.
+- **Guided first-run**: a new **Settings › Integration** tab detects the extension state, opens System Settings, and reloads Finder; macOS 15 dropped the graphical toggle, so the app ships a one-click `pluginkit` fallback.
+
+### 6. 🔤 Pocket EN ↔ ZH Mini Translator
 - **One click away, no context switch**: An `A文` button sits in the footer of both the clipboard panel and the process inspector; clicking it opens a 344pt popover without ever leaving the menu bar.
 - **Bidirectional instant translation**: Two fields — **whichever side you type into, the other side fills itself** after a 0.35 s pause. Text containing CJK ideographs goes 中 → 英, everything else 英 → 中, and the header pill shows the active direction.
 - **Made for naming variables**: `userName` → 用户名, 主要按钮 → `Main button`; results are plain selectable text, so ⌘C is enough.
@@ -172,6 +179,20 @@ Mac power users and developers often struggle with two notorious menu bar issues
 
 ---
 
+### Finder Context Menu
+
+| Right-click menu: terminal, editors, new files | New File panel with live preview |
+| :---: | :---: |
+| <img src="docs/screenshots/finder-menu.png" alt="Finder context menu" width="230" /> | <img src="docs/screenshots/finder-newfile.png" alt="New File panel" width="430" /> |
+| <sub>Every installed IDE gets its own "Open with X" item; creation actions sit below the separator</sub> | <sub>Six types plus a custom extension, duplicate-safe naming, and a live filename preview</sub> |
+
+| Settings › Integration: extension status and one-click enable |
+| :---: |
+| <img src="docs/screenshots/settings-integration.png" alt="Integration Settings" width="560" /> |
+| <sub>Enable state, System Settings shortcut, re-check, reload Finder, and TCC guidance for Desktop/Documents/Downloads</sub> |
+
+---
+
 ## <a id="download"></a>📦 Download & Installation
 
 ### Option 1: Pre-built Binary Release (Recommended)
@@ -189,6 +210,19 @@ Once installed, ClipStats checks for a newer release 8 seconds after launch and 
 >    ```bash
 >    xattr -dr com.apple.quarantine /Applications/ClipStats.app
 >    ```
+
+### After installing: enable the Finder extension (important)
+
+The context menu is provided by a system **Finder extension**, which has to be enabled once:
+
+1. Open ClipStats → **Settings › Integration** and check the extension status;
+2. Click **Open System Settings…** and tick **ClipStats Extension** under **General › Login Items & Extensions › Finder Extensions**;
+3. Come back and click **Re-check** — status turns green. If the menu still does not show up, click **Reload Finder**.
+
+> [!NOTE]
+> - **macOS 15 (Sequoia)** removed the graphical Finder-extensions toggle. Click **Enable Extension** in the Integration tab instead (the app calls `pluginkit` for you); copy the shown command into Terminal as a fallback. The toggle is back on macOS 26.
+> - The first time you create a file in **Desktop / Documents / Downloads**, macOS asks for permission once. You can also grant it early from the Integration tab.
+> - Keep the app in `/Applications`: running it straight from the DMG triggers App Translocation and the extension registers from a temporary path.
 
 ---
 
@@ -390,6 +424,13 @@ Absolutely! You only need the macOS Command Line Tools (installable via <code>xc
 <summary><b>Q6: Does the app phone home? Can I disable the update check?</b></summary>
 <p>
 The update check is the only network request in the entire app. It reads the public GitHub release endpoint for the latest version tag, the dmg URL, and the release notes — nothing is uploaded, no account is needed, and no identifiers are sent. It runs 8 seconds after launch and then every 24 hours, and can be turned off in <b>Settings › About › Software Updates</b>; after that the app only goes online when you press "Check for Updates" yourself. When a newer version exists a small glass popover appears; "Download & Install" fetches the dmg into the app's own data folder and mounts it, so you can drag ClipStats into Applications.
+</p>
+</details>
+
+<details>
+<summary><b>Q6: The ClipStats menu is missing from the Finder context menu, or clicking does nothing?</b></summary>
+<p>
+First make sure the extension is enabled: **Settings › Integration** should read "已启用" in green. If it is grey, click **Open System Settings…** and tick ClipStats under **General › Login Items & Extensions › Finder Extensions**; on macOS 15 that toggle does not exist — just press **Enable Extension** in the Integration tab (it runs <code>pluginkit</code> under the hood). Still nothing after enabling? Click **Reload Finder**. Also make sure the app lives in /Applications — launching it from the DMG registers the extension from a temporary path.
 </p>
 </details>
 

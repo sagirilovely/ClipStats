@@ -8,6 +8,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
     case sampling = "刷新频率"
     case clipboard = "剪贴板"
     case hotkey = "快捷键"
+    case integration = "集成"
     case about = "关于"
     var id: String { rawValue }
 
@@ -18,6 +19,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         case .sampling: return "sampling"
         case .clipboard: return "clipboard"
         case .hotkey: return "hotkey"
+        case .integration: return "integration"
         case .about: return "about"
         }
     }
@@ -29,6 +31,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         case .sampling: return "gauge.with.needle.fill"
         case .clipboard: return "doc.on.clipboard.fill"
         case .hotkey: return "command"
+        case .integration: return "puzzlepiece.extension.fill"
         case .about: return "info.circle.fill"
         }
     }

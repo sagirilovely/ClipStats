@@ -21,6 +21,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - 生命周期
 
+    /// 必须早于 didFinishLaunching：冷启动时 URL 事件可能在这之前就送到
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        FinderBridge.shared.install()
+    }
+
+    /// 兜底：某些路径下系统会把 URL 作为「打开」事件交过来
+    func application(_ application: NSApplication, open urls: [URL]) {
+        for url in urls {
+            FinderBridge.shared.handle(url)
+        }
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         statusBar = StatusBarController(settingsStore: store) { [weak self] _ in
             self?.buildMenu()
@@ -375,6 +387,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                         NSLog("%@", "DIAG settings windows=\(NSApp.windows.map { "\($0.className):\($0.isVisible):\($0.frame)" })")
                     }
                 }
+            } else if show == "integration" {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+                    guard let self else { return }
+                    self.openSettingsWindow()
+                    self.settingsWindow?.viewModel.tab = .integration
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+                        if let view = self.settingsWindow?.window?.contentView {
+                            self.snapshot(view, to: "/tmp/shot-integration.png")
+                        }
+                        NSLog("%@", "DIAG integration snapshot done")
+                    }
+                }
+            } else if show == "newfile" {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+                    guard let self else { return }
+                    let desktop = URL(fileURLWithPath: NSHomeDirectory() + "/Desktop", isDirectory: true)
+                    NewFilePanelController.shared.show(directory: desktop)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+                        if let panel = NSApp.windows.first(where: { $0.title == "新建文件" }),
+                           let view = panel.contentView {
+                            self.snapshot(view, to: "/tmp/shot-newfile.png")
+                        }
+                        NSLog("%@", "DIAG newfile windows=\(NSApp.windows.map { "\($0.className):\($0.isVisible):\($0.frame)" })")
+                    }
+                }
             }
         }
     }
@@ -417,7 +454,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func captureSettingsTabs() {
         guard let controller = settingsWindow else { return }
-        let tabs: [SettingsTab] = [.statusBar, .appearance, .sampling, .clipboard, .hotkey, .about]
+        let tabs: [SettingsTab] = [.statusBar, .appearance, .sampling, .clipboard, .hotkey, .integration, .about]
         for (index, tab) in tabs.enumerated() {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.6 + Double(index) * 0.9) { [weak self] in
                 controller.viewModel.tab = tab
