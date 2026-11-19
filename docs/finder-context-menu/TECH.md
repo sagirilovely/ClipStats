@@ -51,7 +51,7 @@ Finder ──▶ ClipStatsFinder.appex（沙盒，只读）
 
 | 文件 | 状态 | 作用 | 预估 |
 | --- | --- | --- | --- |
-| `Sources/FinderExt/FinderExt.swift` | 已实现 | 扩展：目录监听、菜单构建、点击分发、诊断日志 | ~180 行 |
+| `Sources/FinderExt/FinderExt.swift` | 已实现 | 扩展：目录监听、菜单构建（多编辑器项）、点击分发、诊断日志 | ~230 行 |
 | `Sources/App/FinderBridge.swift` | 已有（验证版） | 主 App：URL 事件、建文件、开终端、错误映射 | ~95 → ~180 行 |
 | `Sources/UI/FinderHUD.swift` | 待新增 | 不抢焦点的结果提示（nonactivatingPanel + 玻璃样式） | ~120 行 |
 | `Sources/UI/NewFilePanel.swift` | 已实现 | 「新建文件…」面板（路径 + 文件名 + 类型/自定义后缀 + 回车创建） | ~210 行 |
@@ -112,7 +112,7 @@ override func menu(for menuKind: FIMenuKind) -> NSMenu? {
 | 菜单项 | tag | 发出的 URL | 执行方 |
 | --- | --- | --- | --- |
 | 在终端中打开 | 1 | `clipstats://openterminal?dir=…` | 主 App |
-| 在 <编辑器> 中打开 | 2 | `clipstats://openfile?path=…&app=<bundleID>` | 主 App |
+| 由 <编辑器> 打开 | 100 + 编辑器序号 | `clipstats://openfile?path=…&app=<bundleID>` | 主 App |
 | 新建 Markdown 文件 | 3 | `clipstats://newfile?dir=…&ext=md` | 主 App |
 | 新建文件… | 4 | `clipstats://panel?dir=…` | 主 App（弹面板） |
 
