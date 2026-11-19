@@ -52,6 +52,8 @@ final class UpdateChecker: NSObject, ObservableObject {
 
     private var checkTask: URLSessionDataTask?
     private var downloadTask: URLSessionDownloadTask?
+    /// 上次被 GitHub 限流时服务器给出的重置时间
+    private(set) var rateLimitedUntil: Date?
     private var pendingRelease: UpdateRelease?
 
     private enum Keys {
@@ -95,6 +97,17 @@ final class UpdateChecker: NSObject, ObservableObject {
         checkTask?.cancel()
         state = .checking
 
+        // 自检：强制走 302 兜底路径（模拟 API 被限流）
+        if ProcessInfo.processInfo.environment["CLIPSTATS_DIAG_FORCE_REDIRECT"] == "1" {
+            checkViaRedirect(automatic: automatic)
+            return
+        }
+        // 还在服务器给的重置时间内：自动检查直接走不占配额的兜底路径
+        if automatic, let reset = rateLimitedUntil, reset > Date() {
+            checkViaRedirect(automatic: automatic)
+            return
+        }
+
         guard let url = URL(string: "https://api.github.com/repos/\(owner)/\(repo)/releases/latest") else {
             state = .failed("更新地址无效")
             return
@@ -127,8 +140,13 @@ final class UpdateChecker: NSObject, ObservableObject {
         }
 
         if http.statusCode == 403 {
-            // 未认证 API 限流：静默，下次再说
-            state = .failed(automatic ? "" : "GitHub 接口限流，请稍后再试")
+            // 未认证的 API 每小时只有 60 次（按 IP 计）。这里不直接放弃，
+            // 而是改走 github.com/releases/latest 的 302 跳转读出版本号——这条路不消耗 API 配额。
+            let reset = http.value(forHTTPHeaderField: "x-ratelimit-reset").flatMap(Double.init)
+            if let reset {
+                rateLimitedUntil = Date(timeIntervalSince1970: reset)
+            }
+            checkViaRedirect(automatic: automatic)
             return
         }
         guard http.statusCode == 200, let data else {
@@ -171,6 +189,57 @@ final class UpdateChecker: NSObject, ObservableObject {
 
         if automatic, skippedVersion == remote { return }
         onAvailable?(release)
+    }
+
+    /// 兜底：请求 GitHub 的 release 页面（服务端 302 到 /releases/tag/vX.Y.Z），
+    /// 让 URLSession 跟着跳转，从最终 URL 里取出 tag。没有更新说明与资产列表，
+    /// dmg 链接按我们的打包命名约定拼出来。
+    private func checkViaRedirect(automatic: Bool) {
+        guard let url = URL(string: "https://github.com/\(owner)/\(repo)/releases/latest") else {
+            state = .failed(automatic ? "" : "GitHub 接口限流，请稍后再试")
+            return
+        }
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 12
+        request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
+
+        plainSession.dataTask(with: request) { [weak self] _, response, error in
+            guard let self else { return }
+            DispatchQueue.main.async {
+                if let error {
+                    self.state = .failed(automatic ? "" : "检查失败：\(error.localizedDescription)")
+                    return
+                }
+                guard let finalURL = response?.url else {
+                    self.state = .failed(automatic ? "" : "GitHub 接口限流，稍后会自动重试")
+                    return
+                }
+                let tag = finalURL.lastPathComponent
+                guard tag.hasPrefix("v"), tag.count > 1 else {
+                    self.state = .failed(automatic ? "" : "GitHub 接口限流，稍后会自动重试")
+                    return
+                }
+                self.markChecked()
+                self.rateLimitedUntil = nil
+                let version = String(tag.dropFirst())
+                guard Self.isNewer(version, than: self.currentVersion) else {
+                    self.state = .upToDate(self.currentVersion)
+                    return
+                }
+                let dmg = URL(string: "https://github.com/\(self.owner)/\(self.repo)/releases/download/\(tag)/ClipStats-\(version)-macos-universal.dmg")
+                let release = UpdateRelease(
+                    version: version,
+                    tag: tag,
+                    pageURL: finalURL,
+                    dmgURL: dmg,
+                    notes: "",
+                    publishedAt: nil
+                )
+                self.state = .available(release)
+                if automatic, self.skippedVersion == version { return }
+                self.onAvailable?(release)
+            }
+        }.resume()
     }
 
     private func markChecked() {

@@ -160,7 +160,7 @@ struct UpdatePanelView: View {
             }
 
             ScrollView {
-                Text(release.notes.isEmpty ? "这个版本没有写更新说明。" : Self.plainNotes(release.notes))
+                Text(release.notes.isEmpty ? "这个版本没有抓到更新说明，可以点「查看 Release」到 GitHub 上看。" : Self.plainNotes(release.notes))
                     .font(.system(size: 10.5, design: .monospaced))
                     .foregroundStyle(.secondary)
                     .lineSpacing(2)
