@@ -492,6 +492,9 @@ final class ClipboardPreviewController {
         }
         hosting.view.wantsLayer = true
         hosting.view.layer?.backgroundColor = NSColor.clear.cgColor
+        // 裁成和玻璃一致的圆角，否则系统玻璃的阴影会被窗口矩形切出直角黑边
+        hosting.view.layer?.cornerRadius = 14
+        hosting.view.layer?.masksToBounds = true
         panel.contentViewController = hosting
 
         self.panel = panel

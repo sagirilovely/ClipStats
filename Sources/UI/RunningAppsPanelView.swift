@@ -63,9 +63,20 @@ struct RunningAppsPanelView: View {
 
     // MARK: - 详情
 
+    /// 模式切换包一层 withAnimation：卡片淡入淡出 + 列表重排都用同一条缓动，避免「硬切」的闪一下
+    private var modeSelection: Binding<MetricMode> {
+        Binding(
+            get: { model.mode },
+            set: { newValue in
+                guard newValue != model.mode else { return }
+                withAnimation(.easeInOut(duration: 0.2)) { model.mode = newValue }
+            }
+        )
+    }
+
     private var detailSection: some View {
         VStack(spacing: 10) {
-            Picker("", selection: $model.mode) {
+            Picker("", selection: modeSelection) {
                 ForEach(MetricMode.allCases) { mode in
                     Text(mode.rawValue).tag(mode)
                 }
@@ -74,6 +85,8 @@ struct RunningAppsPanelView: View {
             .labelsHidden()
 
             detailCard
+                .id(model.mode)
+                .transition(.opacity.combined(with: .scale(scale: 0.985, anchor: .top)))
         }
         .padding(.horizontal, 14)
         .padding(.bottom, 10)
@@ -466,6 +479,7 @@ struct RunningAppsPanelView: View {
                 .onReceive(NotificationCenter.default.publisher(for: NSScrollView.didLiveScrollNotification)) { _ in
                     model.hoveredPID = nil
                 }
+                .animation(.easeInOut(duration: 0.2), value: model.mode)
             }
         }
         .frame(maxHeight: .infinity)

@@ -96,16 +96,38 @@ final class RunningAppsModel: ObservableObject {
 
     // MARK: - 列表
 
-    func reload() {
-        let samples = sampler.sample(includeGPU: mode == .gpu)
+    /// 采样会遍历所有进程（约 30–40ms），放到后台队列做，避免切换模式时主线程被卡住而闪一下
+    private let samplingQueue = DispatchQueue(label: "clipstats.apps.sampling", qos: .userInitiated)
+    private var reloadGeneration = 0
 
+    func reload() {
+        reloadGeneration &+= 1
+        let generation = reloadGeneration
+        let capturedMode = mode
         var previousState: [pid_t: RunningAppItem.QuitState] = [:]
         for item in apps {
             previousState[item.pid] = item.quitState
         }
+        let networkRates = capturedMode == .network ? networkMonitor.snapshot() : [:]
 
-        let networkRates = mode == .network ? networkMonitor.snapshot() : [:]
+        samplingQueue.async { [weak self] in
+            guard let self else { return }
+            let samples = self.sampler.sample(includeGPU: capturedMode == .gpu)
+            DispatchQueue.main.async {
+                // 期间又触发了新的采样：旧结果直接丢掉，避免列表来回跳
+                guard self.reloadGeneration == generation else { return }
+                self.apply(samples: samples,
+                           mode: capturedMode,
+                           previousState: previousState,
+                           networkRates: networkRates)
+            }
+        }
+    }
 
+    private func apply(samples: [ProcessSample],
+                       mode: MetricMode,
+                       previousState: [pid_t: RunningAppItem.QuitState],
+                       networkRates: [pid_t: (down: Double, up: Double)]) {
         var items: [RunningAppItem] = samples.map { sample in
             let app = NSRunningApplication(processIdentifier: sample.pid)
             var item = RunningAppItem(
@@ -129,8 +151,8 @@ final class RunningAppsModel: ObservableObject {
         }
 
         items.sort { lhs, rhs in
-            let left = metricValue(lhs)
-            let right = metricValue(rhs)
+            let left = metricValue(lhs, mode: mode)
+            let right = metricValue(rhs, mode: mode)
             if left != right { return left > right }
             return lhs.name.localizedStandardCompare(rhs.name) == .orderedAscending
         }
@@ -142,7 +164,7 @@ final class RunningAppsModel: ObservableObject {
         }
     }
 
-    private func metricValue(_ item: RunningAppItem) -> Double {
+    private func metricValue(_ item: RunningAppItem, mode: MetricMode) -> Double {
         switch mode {
         case .cpu: return item.cpu
         case .gpu: return item.gpu

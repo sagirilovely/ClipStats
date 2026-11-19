@@ -48,6 +48,12 @@ enum PanelPresentation {
 
     static func present(_ window: NSWindow) {
         bumpToken(window)
+        // 面板已经在屏幕上（例如切换状态栏模块时重新调用 show）：只保证置前，不重播展开动画，
+        // 否则每次切换都会缩放淡入一次，看起来像整块面板闪了一下。
+        guard !window.isVisible else {
+            window.orderFront(nil)
+            return
+        }
         window.orderFront(nil)
         guard !reduceMotion, let layer = window.contentView?.layer else { return }
         layer.transform = CATransform3DIdentity

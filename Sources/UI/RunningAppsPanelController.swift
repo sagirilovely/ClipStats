@@ -131,6 +131,9 @@ final class RunningAppsPanelController: NSObject, NSWindowDelegate {
             panel.contentView?.wantsLayer = true
         }
         panel.contentView?.layer?.backgroundColor = NSColor.clear.cgColor
+        // 把整块内容裁成和玻璃一样的圆角：否则系统玻璃自带的阴影会被窗口矩形切出直角黑边
+        panel.contentView?.layer?.cornerRadius = 20
+        panel.contentView?.layer?.masksToBounds = true
 
         self.panel = panel
         return panel

@@ -411,6 +411,9 @@ final class TranslationPanelController: NSObject, NSWindowDelegate {
         let hosting = NSHostingController(rootView: TranslationPanelView(model: model, store: store))
         hosting.view.wantsLayer = true
         hosting.view.layer?.backgroundColor = NSColor.clear.cgColor
+        // 裁成和玻璃一致的圆角，否则系统玻璃的阴影会被窗口矩形切出直角黑边
+        hosting.view.layer?.cornerRadius = 18
+        hosting.view.layer?.masksToBounds = true
         hosting.view.frame = NSRect(origin: .zero, size: size)
         panel.contentViewController = hosting
         panel.setContentSize(size)
