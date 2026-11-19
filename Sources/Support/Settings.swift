@@ -260,6 +260,9 @@ struct AppSettings: Codable {
     var previewFileContents: Bool = true
     var clipboardPanelHeight: Double = 460
 
+    /// 启动后 / 每 24 小时自动向 GitHub 查询一次新版本（唯一的网络请求，可关闭）
+    var autoCheckUpdates: Bool = true
+
     // 系统
     var launchAtLogin: Bool = false
     var hotKey: HotKeyConfig? = .optionCommandV
@@ -289,6 +292,7 @@ struct AppSettings: Codable {
         previewFileContents = (try? c.decodeIfPresent(Bool.self, forKey: .previewFileContents)) ?? d.previewFileContents
         clipboardPanelHeight = (try? c.decodeIfPresent(Double.self, forKey: .clipboardPanelHeight)) ?? d.clipboardPanelHeight
         launchAtLogin = (try? c.decodeIfPresent(Bool.self, forKey: .launchAtLogin)) ?? d.launchAtLogin
+        autoCheckUpdates = (try? c.decodeIfPresent(Bool.self, forKey: .autoCheckUpdates)) ?? d.autoCheckUpdates
         hotKey = (try? c.decodeIfPresent(HotKeyConfig.self, forKey: .hotKey)) ?? d.hotKey
         normalize()
     }

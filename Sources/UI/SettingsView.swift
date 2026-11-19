@@ -4,6 +4,7 @@ import AppKit
 struct SettingsView: View {
     @ObservedObject var store: SettingsStore
     @ObservedObject var viewModel: SettingsViewModel
+    @ObservedObject private var updateChecker = UpdateChecker.shared
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
@@ -806,6 +807,50 @@ struct SettingsView: View {
                         }
                     }
                 }
+
+                GlassCard(title: "软件更新", icon: "arrow.down.circle.fill", tint: .blue) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Toggle("自动检查更新（每 24 小时一次）", isOn: binding(\.autoCheckUpdates))
+                            .font(.system(size: 12.5))
+                        Text("这是本应用唯一的网络请求：只向 GitHub 查询最新版本号，不上传剪贴板内容、设备标识或任何使用数据。")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+
+                        HStack(spacing: 10) {
+                            Button {
+                                NotificationCenter.default.post(name: .requestUpdateCheck, object: nil)
+                            } label: {
+                                Text("检查更新")
+                                    .font(.system(size: 11.5, weight: .medium))
+                            }
+                            .buttonStyle(LiquidGlassButtonStyle())
+
+                            if let last = updateChecker.lastCheckDate {
+                                Text("上次检查：" + Fmt.relativeTime(last))
+                                    .font(.system(size: 10.5, design: .monospaced))
+                                    .foregroundStyle(.tertiary)
+                            }
+
+                            Spacer()
+
+                            Text("当前 v" + updateChecker.currentVersion)
+                                .font(.system(size: 10.5, design: .monospaced))
+                                .foregroundStyle(.secondary)
+                        }
+
+                        if let skipped = updateChecker.skippedVersion {
+                            HStack(spacing: 8) {
+                                Text("已跳过版本 v" + skipped)
+                                    .font(.system(size: 10.5))
+                                    .foregroundStyle(.tertiary)
+                                Button("恢复提醒") {
+                                    updateChecker.resetSkippedVersion()
+                                }
+                                .buttonStyle(LiquidGlassButtonStyle())
+                            }
+                        }
+                    }
+                }
             }
             .padding(18)
         }
@@ -866,4 +911,6 @@ private struct GlassCard<Content: View>: View {
 
 extension Notification.Name {
     static let clipboardHistoryCleared = Notification.Name("clipstats.clipboardHistoryCleared")
+    /// 关于页点「检查更新」时发出，由 AppDelegate 统一处理（它持有更新面板）
+    static let requestUpdateCheck = Notification.Name("clipstats.requestUpdateCheck")
 }

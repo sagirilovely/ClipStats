@@ -48,7 +48,7 @@ Mac power users and developers often struggle with two notorious menu bar issues
 - **Interactive Segments & Running Apps Inspector**: Hovering over any metric lights up an isolated subtle glow; clicking on CPU, GPU, Memory, or Network pops up an instant top-process inspector with one-click termination.
 - **Built-in Offline EN ↔ ZH Translator**: A tiny `A文` button in both panel footers opens a 344pt popover where typing on one side instantly fills the other — no browser tab, no translation app, and inference never leaves your Mac.
 - **Zero Accessibility Permissions Required**: Leverages low-level Carbon Global HotKey APIs (`⌥⌘V`) and system pasteboard changeCount tracking. Zero invasive permissions needed.
-- **Privacy-First Local Storage**: Powered by embedded SQLite3 with Write-Ahead Logging (WAL) and SHA-256 deduplication. 100% offline with zero cloud telemetry.
+- **Privacy-First Local Storage**: Powered by embedded SQLite3 with Write-Ahead Logging (WAL) and SHA-256 deduplication. Nothing you copy ever leaves the machine, and there is no telemetry.
 - **Xcode-Free Ultra-Fast Build**: Crafted in pure native Swift with no bulky SPM/CocoaPods dependencies. Compiles in seconds using standard macOS Command Line Tools. Typical resident memory is **< 25MB** with **< 0.5% CPU overhead**.
 
 ---
@@ -67,7 +67,7 @@ Mac power users and developers often struggle with two notorious menu bar issues
 | **Vertical Dual-Row Net Speed** | **✅ Supported (50% Space Saved)** | ✅ Supported | — | ✅ Supported | — |
 | **Built-in EN ↔ ZH Translator** | **✅ On-device system translation (macOS 15+)** | — | — | — | — |
 | **Xcode-Free CLI Build** | **✅ Instant (Makefile + swiftc)** | ⚠️ Requires Xcode | ⚠️ Requires Xcode | ❌ Proprietary | ❌ Proprietary |
-| **Open Source & Free** | **✅ 100% MIT, Zero Telemetry** | ✅ MIT License | ✅ MIT License | ❌ Paid Subscription | ❌ Paid Subscription |
+| **Open Source & Free** | **✅ 100% MIT, zero telemetry (update check only)** | ✅ MIT License | ✅ MIT License | ❌ Paid Subscription | ❌ Paid Subscription |
 
 ---
 
@@ -109,6 +109,7 @@ Mac power users and developers often struggle with two notorious menu bar issues
 ### 4. 🎨 Liquid Glass Preferences System
 - **6 Focused Preference Tabs**: Status Bar Modules, Appearance, Update Intervals, Clipboard Capacity, Global Hotkeys, and About.
 - **Adaptive Appearance**: Instant switching between `Follow System`, `Light`, and `Night (Dark Glass)`.
+- **Automatic Update Check**: Once at launch and every 24 hours the app compares its version with GitHub Releases; a newer build opens a small glass popover with the release notes, and "Download & Install" fetches the dmg and mounts it for a simple drag into Applications.
 - **Pixel-Level Micro Tuning**: Fine-tune font sizes (9–16pt), icon dimensions, horizontal padding (**0–20pt**) and module spacing (**5–20pt**, the 5pt floor still keeps neighbouring segments from touching), plus numeric alignment (Left / Center / Right).
 
 ### 5. 🔤 Pocket EN ↔ ZH Mini Translator
@@ -314,9 +315,12 @@ flowchart TD
    - Operates in `PRAGMA journal_mode = WAL;`, providing instant non-blocking reads and sub-millisecond keyword queries.
 2. **SHA-256 Content Deduplication**
    - Computes SHA-256 digests via Apple's `CryptoKit` to index only unique records.
-3. **100% Offline Local Storage**
-   - Stored strictly in `~/Library/Application Support/ClipStats/clipboard.db`. Zero network requests, zero telemetry, zero analytics; the EN ↔ ZH translator likewise runs entirely on the system framework, locally.
-4. **Zero Accessibility Permissions Required**
+3. **100% Local Storage, Nothing Uploaded**
+   - Stored strictly in `~/Library/Application Support/ClipStats/clipboard.db`. No telemetry, no analytics; the EN ↔ ZH translator likewise runs entirely on the system framework, locally.
+4. **The Only Network Request: Update Check**
+   - Once at launch and once every 24 hours the app asks GitHub for the latest release (`releases/latest`). It reads **only the version tag, download URL, and release notes** — never clipboard content, device identifiers, or usage data.
+   - You can switch it off in **Settings › About › Software Updates**; a manual "Check for Updates" is then the only thing that goes online. No other network code exists in the project.
+5. **Zero Accessibility Permissions Required**
    - Utilizes macOS Carbon `RegisterEventHotKey` for instantaneous invocation without opening sensitive Accessibility key-logging permissions.
 
 ---
@@ -374,6 +378,13 @@ Yes! Apple changes SMC temperature sensor key names across M-series generations.
 <summary><b>Q4: Can I really build this without installing Xcode?</b></summary>
 <p>
 Absolutely! You only need the macOS Command Line Tools (installable via <code>xcode-select --install</code>, ~200MB). The project compiles directly via a clean Makefile and swiftc, taking only a few seconds.
+</p>
+</details>
+
+<details>
+<summary><b>Q6: Does the app phone home? Can I disable the update check?</b></summary>
+<p>
+The update check is the only network request in the entire app. It reads the public GitHub release endpoint for the latest version tag, the dmg URL, and the release notes — nothing is uploaded, no account is needed, and no identifiers are sent. It runs 8 seconds after launch and then every 24 hours, and can be turned off in <b>Settings › About › Software Updates</b>; after that the app only goes online when you press "Check for Updates" yourself. When a newer version exists a small glass popover appears; "Download & Install" fetches the dmg into the app's own data folder and mounts it, so you can drag ClipStats into Applications.
 </p>
 </details>
 

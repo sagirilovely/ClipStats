@@ -11,6 +11,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var panelController: ClipboardPanelController!
     private var appsController: RunningAppsPanelController!
     private var translationController: TranslationPanelController!
+    private let updateChecker = UpdateChecker.shared
+    private var updatePanelController: UpdatePanelController!
+    private var updateTimer: DispatchSourceTimer?
     private var settingsWindow: SettingsWindowController?
 
     private var lastApplied: AppSettings?
@@ -25,6 +28,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panelController = ClipboardPanelController()
         appsController = RunningAppsPanelController()
         translationController = TranslationPanelController()
+        updatePanelController = UpdatePanelController(checker: updateChecker, store: store)
+        updateChecker.cleanUpOldDownloads()
+        setUpUpdateChecking()
 
         // 点剪贴板分段 → 剪贴板历史；点其它任意模块 → 正在运行的应用程序（自动定位并高亮对应分类）
         statusBar.onSegmentClick = { [weak self] kind, anchor in
@@ -338,6 +344,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
                     }
                 }
+            } else if show == "update" {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+                    guard let self else { return }
+                    self.updatePanelController.show(anchor: self.statusBar.anchorFrame)
+                    self.updateChecker.check(automatic: false)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                        NSLog("%@", "DIAG update state=\(self.updateChecker.state)")
+                        if let view = self.updatePanelController.panelContentView {
+                            self.snapshot(view, to: "/tmp/shot-update.png")
+                        }
+                        if ProcessInfo.processInfo.environment["CLIPSTATS_DIAG_UPDATE_DOWNLOAD"] == "1",
+                           case .available(let release) = self.updateChecker.state {
+                            NSLog("%@", "DIAG update start download \(release.version)")
+                            self.updateChecker.download(release)
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 8.0) {
+                                NSLog("%@", "DIAG update after download state=\(self.updateChecker.state)")
+                                if let view = self.updatePanelController.panelContentView {
+                                    self.snapshot(view, to: "/tmp/shot-update-done.png")
+                                }
+                            }
+                        }
+                    }
+                }
             } else if show == "settings" {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
                     guard let self else { return }
@@ -453,6 +482,46 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - 设置应用
 
+    // MARK: - 更新检查
+
+    private func setUpUpdateChecking() {
+        // 自动检查发现新版本时弹面板（同一版本用户点过「跳过此版本」就不会再弹）
+        updateChecker.onAvailable = { [weak self] _ in
+            guard let self, !self.updatePanelController.isVisible else { return }
+            self.translationController.hide()
+            self.panelController.hide()
+            self.appsController.hide()
+            self.updatePanelController.show(anchor: self.statusBar.anchorFrame)
+        }
+
+        NotificationCenter.default.addObserver(
+            forName: .requestUpdateCheck, object: nil, queue: .main
+        ) { [weak self] _ in
+            self?.checkForUpdates(manual: true)
+        }
+
+        // 启动后稍等再查，避免和首屏渲染、指标采样抢资源
+        DispatchQueue.main.asyncAfter(deadline: .now() + 8) { [weak self] in
+            guard let self, self.store.settings.autoCheckUpdates else { return }
+            self.updateChecker.checkIfNeeded()
+        }
+
+        // 每 24 小时一次；checkIfNeeded 内部还会再看一次冷却期
+        let timer = DispatchSource.makeTimerSource(queue: .main)
+        timer.schedule(deadline: .now() + 24 * 60 * 60, repeating: 24 * 60 * 60, leeway: .seconds(300))
+        timer.setEventHandler { [weak self] in
+            guard let self, self.store.settings.autoCheckUpdates else { return }
+            self.updateChecker.checkIfNeeded()
+        }
+        timer.resume()
+        updateTimer = timer
+    }
+
+    private func checkForUpdates(manual: Bool) {
+        updatePanelController.show(anchor: statusBar.anchorFrame)
+        updateChecker.check(automatic: !manual)
+    }
+
     private func apply(_ settings: AppSettings) {
         let previous = lastApplied
         lastApplied = settings
@@ -464,6 +533,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             panelController.applyAppearance(settings.interfaceAppearance)
             appsController.applyAppearance(settings.interfaceAppearance)
             translationController.applyAppearance(settings.interfaceAppearance)
+            updatePanelController.applyAppearance(settings.interfaceAppearance)
             settingsWindow?.applyAppearance(settings.interfaceAppearance)
         }
 
@@ -568,6 +638,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         preferences.target = self
         menu.addItem(preferences)
 
+        let checkUpdate = NSMenuItem(title: "检查更新…", action: #selector(checkForUpdatesFromMenu), keyEquivalent: "")
+        checkUpdate.target = self
+        menu.addItem(checkUpdate)
+
+        menu.addItem(.separator())
+
         let quit = NSMenuItem(title: "退出 ClipStats", action: #selector(quit), keyEquivalent: "q")
         quit.target = self
         menu.addItem(quit)
@@ -594,6 +670,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ClipboardStore.shared.clear()
         statusBar.updateClipboardCount(0)
         panelController.model.reload()
+    }
+
+    @objc private func checkForUpdatesFromMenu() {
+        panelController.hide()
+        appsController?.hide()
+        checkForUpdates(manual: true)
     }
 
     @objc private func openSettings() {

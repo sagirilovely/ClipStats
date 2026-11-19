@@ -104,12 +104,13 @@ final class TranslationService: ObservableObject {
     func refreshAvailability() {
         guard #available(macOS 15.0, *) else { return }
         Task { [weak self] in
+            guard let self else { return }
             let availability = LanguageAvailability()
             let source = Locale.Language(identifier: TranslationDirection.enToZh.sourceIdentifier)
             let target = Locale.Language(identifier: TranslationDirection.enToZh.targetIdentifier)
             let status = await availability.status(from: source, to: target)
             await MainActor.run {
-                self?.needsLanguagePack = (status != .installed)
+                self.needsLanguagePack = (status != .installed)
             }
         }
     }
