@@ -179,6 +179,8 @@ Download the latest pre-compiled binaries from [GitHub Releases](https://github.
 - `ClipStats-<version>-macos-universal.zip` —— Universal binary archive (Apple Silicon + Intel), uncompress and run.
 - `ClipStats-<version>-macos-universal.dmg` —— Standard macOS drag-and-drop installer disk image.
 
+Once installed, ClipStats checks for a newer release 8 seconds after launch and every 24 hours. When one exists, a small glass popover shows the release notes and "Download & Install" fetches the dmg and mounts it, so overwriting the old copy is all it takes. The check can be disabled in **Settings › About › Software Updates**.
+
 > [!TIP]
 > **First-time Gatekeeper Warning Resolution**  
 > ClipStats is an open-source project signed with local Ad-hoc certificates. If macOS Gatekeeper alerts that the app cannot be opened:
@@ -347,6 +349,9 @@ CLIPSTATS_DIAG=1 CLIPSTATS_DIAG_SHOW=preview CLIPSTATS_DIAG_PREVIEW_KIND=image .
 
 # 6. Open the translator and run one real translation (log + /tmp/shot-translate.png)
 CLIPSTATS_DIAG=1 CLIPSTATS_DIAG_SHOW=translate CLIPSTATS_DIAG_TRANSLATE_TEXT=userName ./build/ClipStats.app/Contents/MacOS/ClipStats
+
+# 7. Open the update popover and run one check (fake an older version / force the rate-limit fallback)
+CLIPSTATS_FAKE_VERSION=1.0.0 CLIPSTATS_DIAG=1 CLIPSTATS_DIAG_SHOW=update ./build/ClipStats.app/Contents/MacOS/ClipStats
 ```
 
 ---

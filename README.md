@@ -178,6 +178,8 @@
 - `ClipStats-<version>-macos-universal.zip` —— 通用架构（Apple Silicon + Intel）归档，解压即可运行。
 - `ClipStats-<version>-macos-universal.dmg` —— 官方拖拽安装镜像。
 
+装好之后 ClipStats 会在启动 8 秒后、以及每 24 小时自查一次新版本；发现更新会弹出一枚玻璃小窗（含更新说明），点「下载并安装」即把 dmg 下到本地并自动挂载，覆盖安装即可完成升级。该检查可在「设置 › 关于 › 软件更新」关闭。
+
 > [!TIP]
 > **首次运行遇到「已损坏」或「无法打开」提示？**  
 > 本项目为开源软件，使用 Ad-hoc 方式自签名。若 macOS 系统的 Gatekeeper 阻止运行，您只需：
@@ -346,6 +348,9 @@ CLIPSTATS_DIAG=1 CLIPSTATS_DIAG_SHOW=preview CLIPSTATS_DIAG_PREVIEW_KIND=image .
 
 # 6. 打开英汉小翻译并跑一次真实翻译（结果与截图写入日志与 /tmp/shot-translate.png）
 CLIPSTATS_DIAG=1 CLIPSTATS_DIAG_SHOW=translate CLIPSTATS_DIAG_TRANSLATE_TEXT=userName ./build/ClipStats.app/Contents/MacOS/ClipStats
+
+# 7. 打开更新面板并检查一次（伪造旧版本 / 强制走限流兜底路径 / 指定安装包落地目录）
+CLIPSTATS_FAKE_VERSION=1.0.0 CLIPSTATS_DIAG=1 CLIPSTATS_DIAG_SHOW=update ./build/ClipStats.app/Contents/MacOS/ClipStats
 ```
 
 ---
