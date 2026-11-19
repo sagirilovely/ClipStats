@@ -4,6 +4,8 @@
   <a href="README.md">简体中文文档</a> &nbsp;｜&nbsp; <b>English Document</b>
 </p>
 
+<img src="logo.svg" width="104" alt="ClipStats" />
+
 # 🚀 ClipStats
 
 **The Ultra-Lightweight, Native macOS Menu Bar System Monitor, Privacy-First Clipboard Manager & Offline Mini Translator**  

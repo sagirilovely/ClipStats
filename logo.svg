@@ -1,85 +1,143 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-label="ClipStats logo">
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-label="ClipStats">
   <defs>
-    <!-- 液态玻璃底：青 → 蓝 → 紫，和 App 内的 accent 渐变同源 -->
-    <linearGradient id="glassBase" x1="0.15" y1="0.05" x2="0.85" y2="0.95">
-      <stop offset="0" stop-color="#7BE0FF"/>
-      <stop offset="0.42" stop-color="#2E8BFF"/>
-      <stop offset="0.78" stop-color="#4C6BFF"/>
-      <stop offset="1" stop-color="#8A6BFF"/>
+    <linearGradient id="plateBg" x1="0.18" y1="0" x2="0.82" y2="1">
+      <stop offset="0" stop-color="#3A474C"/>
+      <stop offset="0.40" stop-color="#28343A"/>
+      <stop offset="1" stop-color="#121A1E"/>
     </linearGradient>
-
-    <!-- 顶部镜面高光 -->
-    <linearGradient id="topGloss" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.55"/>
-      <stop offset="0.55" stop-color="#FFFFFF" stop-opacity="0.06"/>
-      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
-    </linearGradient>
-
-    <!-- 右下环境辉光 -->
-    <radialGradient id="ambientGlow" cx="0.5" cy="0.5" r="0.5">
-      <stop offset="0" stop-color="#B98BFF" stop-opacity="0.55"/>
-      <stop offset="1" stop-color="#B98BFF" stop-opacity="0"/>
+    <radialGradient id="plateTopLight" cx="0.36" cy="0.04" r="0.9">
+      <stop offset="0" stop-color="#6C848C" stop-opacity="0.50"/>
+      <stop offset="0.45" stop-color="#37474E" stop-opacity="0.15"/>
+      <stop offset="1" stop-color="#121A1E" stop-opacity="0"/>
     </radialGradient>
-
-    <!-- 外边缘：上亮下暗，模拟玻璃倒角 -->
-    <linearGradient id="rim" x1="0.5" y1="0" x2="0.5" y2="1">
-      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.85"/>
-      <stop offset="0.45" stop-color="#FFFFFF" stop-opacity="0.18"/>
-      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0.55"/>
+    <linearGradient id="plateRim" x1="0.5" y1="0" x2="0.5" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.30"/>
+      <stop offset="0.45" stop-color="#FFFFFF" stop-opacity="0.05"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0.14"/>
     </linearGradient>
 
-    <!-- 剪贴板卡片：白色玻璃，上亮下暗 -->
-    <linearGradient id="card" x1="0.5" y1="0" x2="0.5" y2="1">
-      <stop offset="0" stop-color="#FFFFFF"/>
-      <stop offset="1" stop-color="#E4EEFF"/>
+    <linearGradient id="backSheet" x1="0.1" y1="0" x2="0.9" y2="1">
+      <stop offset="0" stop-color="#CFDCE8" stop-opacity="0.52"/>
+      <stop offset="0.55" stop-color="#A9BBCC" stop-opacity="0.42"/>
+      <stop offset="1" stop-color="#8298AC" stop-opacity="0.38"/>
     </linearGradient>
 
-    <!-- 卡片投影 -->
-    <filter id="cardShadow" x="-40%" y="-40%" width="180%" height="180%">
-      <feDropShadow dx="0" dy="26" stdDeviation="30" flood-color="#0B1E63" flood-opacity="0.38"/>
-    </filter>
+    <linearGradient id="frontSheet" x1="0.15" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#FCFEFF" stop-opacity="0.80"/>
+      <stop offset="0.32" stop-color="#E6EEF7" stop-opacity="0.74"/>
+      <stop offset="0.72" stop-color="#CBD8E5" stop-opacity="0.68"/>
+      <stop offset="1" stop-color="#A7B8C9" stop-opacity="0.64"/>
+    </linearGradient>
+    <linearGradient id="sheetSheen" x1="0.05" y1="0" x2="0.95" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.40"/>
+      <stop offset="0.28" stop-color="#FFFFFF" stop-opacity="0.10"/>
+      <stop offset="0.56" stop-color="#FFFFFF" stop-opacity="0"/>
+      <stop offset="0.86" stop-color="#FFFFFF" stop-opacity="0.12"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0.24"/>
+    </linearGradient>
 
-    <!-- 卡片形状（圆角矩形 + 顶部夹子凸起） -->
-    <clipPath id="clipShape">
+    <linearGradient id="clipMetal" x1="0.5" y1="0" x2="0.5" y2="1">
+      <stop offset="0" stop-color="#FDFEFF"/>
+      <stop offset="0.20" stop-color="#EFF3F7"/>
+      <stop offset="0.52" stop-color="#D8DFE6"/>
+      <stop offset="0.80" stop-color="#BAC4CE"/>
+      <stop offset="1" stop-color="#9FABB8"/>
+    </linearGradient>
+    <linearGradient id="clipSides" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.55"/>
+      <stop offset="0.09" stop-color="#FFFFFF" stop-opacity="0.04"/>
+      <stop offset="0.90" stop-color="#78848F" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0.28"/>
+    </linearGradient>
+
+    <linearGradient id="pulse" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#5FDFCC"/>
+      <stop offset="0.42" stop-color="#9AF9EA"/>
+      <stop offset="0.72" stop-color="#8CF5E3"/>
+      <stop offset="1" stop-color="#5ADAC6"/>
+    </linearGradient>
+
+    <clipPath id="plateClip">
       <rect x="100" y="100" width="824" height="824" rx="186" ry="186"/>
     </clipPath>
-
-    <!-- 用 mask 把柱状图「挖空」，露出背后的玻璃渐变 -->
-    <mask id="cardCut" maskUnits="userSpaceOnUse" x="0" y="0" width="1024" height="1024">
-      <rect x="0" y="0" width="1024" height="1024" fill="black"/>
-      <rect x="322" y="292" width="380" height="470" rx="78" ry="78" fill="white"/>
-      <rect x="452" y="240" width="120" height="104" rx="44" ry="44" fill="white"/>
-      <rect x="404" y="596" width="60" height="104" rx="30" ry="30" fill="black"/>
-      <rect x="482" y="536" width="60" height="164" rx="30" ry="30" fill="black"/>
-      <rect x="560" y="466" width="60" height="234" rx="30" ry="30" fill="black"/>
-      <rect x="404" y="372" width="216" height="52" rx="26" ry="26" fill="black"/>
-    </mask>
+    <clipPath id="frontClip">
+      <rect x="268" y="176" width="464" height="620" rx="48" ry="48"/>
+    </clipPath>
   </defs>
 
+  <!-- 底板投影 -->
+  <g fill="#000000">
+    <rect x="106" y="128" width="812" height="812" rx="184" ry="184" opacity="0.14"/>
+    <rect x="110" y="122" width="804" height="804" rx="182" ry="182" opacity="0.16"/>
+    <rect x="114" y="116" width="796" height="796" rx="180" ry="180" opacity="0.18"/>
+  </g>
+
   <!-- 底板 -->
-  <g clip-path="url(#clipShape)">
-    <rect x="100" y="100" width="824" height="824" fill="url(#glassBase)"/>
-    <circle cx="760" cy="800" r="420" fill="url(#ambientGlow)"/>
-    <ellipse cx="430" cy="170" rx="640" ry="300" fill="url(#topGloss)"/>
-    <!-- 底部微弱反光，避免下半部分发死 -->
-    <ellipse cx="512" cy="968" rx="520" ry="150" fill="#FFFFFF" opacity="0.10"/>
+  <g clip-path="url(#plateClip)">
+    <rect x="100" y="100" width="824" height="824" fill="url(#plateBg)"/>
+    <rect x="100" y="100" width="824" height="824" fill="url(#plateTopLight)"/>
+    <rect x="100" y="726" width="824" height="198" fill="#070D13" opacity="0.30"/>
+  </g>
+  <rect x="102" y="102" width="820" height="820" rx="185" ry="185" fill="none"
+        stroke="url(#plateRim)" stroke-width="3"/>
+  <rect x="110" y="110" width="804" height="804" rx="179" ry="179" fill="none"
+        stroke="#FFFFFF" stroke-opacity="0.05" stroke-width="2"/>
+
+  <!-- 后层玻璃纸 -->
+  <g transform="rotate(12 546 452)">
+    <rect x="330" y="184" width="452" height="604" rx="46" ry="46" fill="#060C12" opacity="0.20"/>
+    <rect x="326" y="180" width="452" height="604" rx="46" ry="46" fill="url(#backSheet)"/>
+    <rect x="328" y="182" width="448" height="600" rx="44" ry="44" fill="none"
+          stroke="#FFFFFF" stroke-opacity="0.24" stroke-width="2.5"/>
   </g>
 
-  <!-- 外边缘 -->
-  <rect x="101.5" y="101.5" width="821" height="821" rx="185" ry="185"
-        fill="none" stroke="url(#rim)" stroke-width="3"/>
-
-  <!-- 剪贴板卡片（白玻璃） -->
-  <g filter="url(#cardShadow)">
-    <rect x="322" y="292" width="380" height="470" rx="78" ry="78" fill="url(#card)" mask="url(#cardCut)"/>
-    <rect x="452" y="240" width="120" height="104" rx="44" ry="44" fill="url(#card)"/>
+  <!-- 前层玻璃纸：柔光边 -->
+  <g transform="rotate(-6 500 486)" opacity="0.5">
+    <rect x="260" y="168" width="480" height="636" rx="58" ry="58" fill="#BFD2E2" opacity="0.09"/>
+    <rect x="264" y="172" width="472" height="628" rx="54" ry="54" fill="#BFD2E2" opacity="0.11"/>
+  </g>
+  <g transform="rotate(-6 500 486)">
+    <rect x="268" y="176" width="464" height="620" rx="48" ry="48" fill="url(#frontSheet)"/>
+    <g clip-path="url(#frontClip)">
+      <rect x="268" y="176" width="464" height="620" fill="url(#sheetSheen)"/>
+      <rect x="268" y="176" width="464" height="180" fill="#FFFFFF" opacity="0.18"/>
+      <rect x="268" y="700" width="464" height="96" fill="#8EA2B5" opacity="0.16"/>
+    </g>
+    <rect x="270" y="178" width="460" height="616" rx="46" ry="46" fill="none"
+          stroke="#FFFFFF" stroke-opacity="0.34" stroke-width="3"/>
   </g>
 
-  <!-- 卡片内侧高光 -->
-  <path d="M400 322 H624" stroke="#FFFFFF" stroke-opacity="0.9" stroke-width="10" stroke-linecap="round"/>
+  <!-- 脉冲 -->
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M336 516 H432 L452 496 L474 548 L502 420 L530 620 L552 516 H690"
+          stroke="#4FD5C0" stroke-opacity="0.12" stroke-width="34"/>
+    <path d="M336 516 H432 L452 496 L474 548 L502 420 L530 620 L552 516 H690"
+          stroke="#6FEFDB" stroke-opacity="0.22" stroke-width="17"/>
+    <path d="M336 516 H432 L452 496 L474 548 L502 420 L530 620 L552 516 H690"
+          stroke="url(#pulse)" stroke-width="6.5"/>
+  </g>
 
-  <!-- 右上角小星芒：翻译 / 智能的暗示 -->
-  <g fill="#FFFFFF" opacity="0.92">
-    <path d="M812 268 C818 300 830 312 862 318 C830 324 818 336 812 368 C806 336 794 324 762 318 C794 312 806 300 812 268 Z"/>
+  <!-- 夹子：吊环 -->
+  <g>
+    <rect x="452" y="126" width="104" height="136" rx="50" ry="50" fill="#050B11" opacity="0.28" transform="translate(0,9)"/>
+    <rect x="452" y="122" width="104" height="136" rx="50" ry="50" fill="url(#clipMetal)"/>
+    <rect x="452" y="122" width="104" height="136" rx="50" ry="50" fill="url(#clipSides)"/>
+    <rect x="454" y="124" width="100" height="132" rx="48" ry="48" fill="none"
+          stroke="#FFFFFF" stroke-opacity="0.65" stroke-width="2"/>
+    <circle cx="504" cy="164" r="22" fill="#161F27"/>
+    <circle cx="504" cy="164" r="22" fill="none" stroke="#7B8794" stroke-opacity="0.7" stroke-width="1.5"/>
+    <path d="M485 152 A22 22 0 0 1 523 152" fill="none" stroke="#FFFFFF" stroke-opacity="0.45" stroke-width="2.5"/>
+  </g>
+
+  <!-- 夹子：横条（窄而薄） -->
+  <g>
+    <rect x="360" y="216" width="304" height="60" rx="20" ry="20" fill="#050B11" opacity="0.22" transform="translate(0,9)"/>
+    <rect x="360" y="214" width="304" height="58" rx="19" ry="19" fill="url(#clipMetal)"/>
+    <rect x="360" y="214" width="304" height="58" rx="19" ry="19" fill="url(#clipSides)"/>
+    <rect x="367" y="217" width="290" height="7" rx="3.5" ry="3.5" fill="#FFFFFF" opacity="0.72"/>
+    <rect x="362" y="216" width="300" height="54" rx="18" ry="18" fill="none"
+          stroke="#FFFFFF" stroke-opacity="0.55" stroke-width="1.6"/>
+    <path d="M370 263 H654" stroke="#3F4B57" stroke-opacity="0.48" stroke-width="3.5" stroke-linecap="round"/>
+    <path d="M370 267 H654" stroke="#FFFFFF" stroke-opacity="0.28" stroke-width="2" stroke-linecap="round"/>
   </g>
 </svg>

@@ -50,9 +50,10 @@ package:
 clean:
 	@rm -rf $(BUILD_DIR)
 
+# 应用图标：以根目录 logo.svg 为唯一来源，栅格化后打包成 AppIcon.icns
 icon:
 	@mkdir -p $(BUILD_DIR)
 	@$(SWIFTC) -module-cache-path $(BUILD_DIR)/mcache scripts/make-icon.swift -o $(BUILD_DIR)/make-icon
-	@$(BUILD_DIR)/make-icon Resources
+	@$(BUILD_DIR)/make-icon logo.svg Resources
 	@iconutil -c icns Resources/AppIcon.iconset -o Resources/AppIcon.icns
 	@echo "icon rebuilt: Resources/AppIcon.icns"

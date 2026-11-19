@@ -4,6 +4,8 @@
   <b>简体中文</b> &nbsp;｜&nbsp; <a href="README_EN.md">English Document</a>
 </p>
 
+<img src="logo.svg" width="104" alt="ClipStats" />
+
 # 🚀 ClipStats
 
 **极致轻量、原汁原味的 macOS 菜单栏系统监控、原生剪贴板管家与随身英汉小翻译**  

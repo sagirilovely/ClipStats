@@ -763,24 +763,12 @@ struct SettingsView: View {
                 GlassCard(title: "ClipStats", icon: "info.circle.fill", tint: .indigo) {
                     VStack(alignment: .leading, spacing: 14) {
                         HStack(spacing: 14) {
-                            ZStack {
-                                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                    .fill(
-                                        LinearGradient(
-                                            colors: [Color.blue, Color.purple],
-                                            startPoint: .topLeading,
-                                            endPoint: .bottomTrailing
-                                        )
-                                    )
-                                    .frame(width: 52, height: 52)
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                            .strokeBorder(Color.white.opacity(0.35), lineWidth: 1.0)
-                                    )
-                                Image(systemName: "doc.on.clipboard.fill")
-                                    .font(.system(size: 26, weight: .medium))
-                                    .foregroundStyle(.white)
-                            }
+                            // 直接用打包进 App 的图标，和 Dock / Finder 里看到的一致
+                            Image(nsImage: NSApp.applicationIconImage)
+                                .resizable()
+                                .interpolation(.high)
+                                .frame(width: 52, height: 52)
+                                .shadow(color: .black.opacity(0.18), radius: 6, y: 3)
 
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("ClipStats")
