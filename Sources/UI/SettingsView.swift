@@ -47,19 +47,12 @@ struct SettingsView: View {
         HStack(spacing: 12) {
             // 应用徽标与标题
             HStack(spacing: 8) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 7, style: .continuous)
-                        .fill(LiquidGlassStyle.accentGradient)
-                        .frame(width: 26, height: 26)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 7, style: .continuous)
-                                .strokeBorder(Color.white.opacity(0.42), lineWidth: 0.7)
-                        )
-                        .shadow(color: Color.blue.opacity(0.20), radius: 5, y: 2)
-                    Image(systemName: "doc.on.clipboard.fill")
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(.white)
-                }
+                // 左上角徽标：用打包进 App 的图标，和关于页 / Finder 保持同一个
+                Image(nsImage: NSApp.applicationIconImage)
+                    .resizable()
+                    .interpolation(.high)
+                    .frame(width: 26, height: 26)
+                    .shadow(color: .black.opacity(0.18), radius: 4, y: 2)
 
                 Text("ClipStats")
                     .font(.system(size: 13, weight: .semibold))
